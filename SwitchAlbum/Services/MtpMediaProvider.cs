@@ -10,6 +10,7 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
     private HashSet<string> _lastDeviceIds = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _pollerCts;
     private Task? _pollerTask;
+    private int _suspendCount;
 
     public event EventHandler<DeviceChangedEventArgs>? DeviceChanged;
 
@@ -115,6 +116,28 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
         _pollerTask = null;
     }
 
+    public IDisposable SuspendPolling()
+    {
+        Interlocked.Increment(ref _suspendCount);
+        return new Resumer(this);
+    }
+
+    private sealed class Resumer : IDisposable
+    {
+        private MtpMediaProvider? _owner;
+
+        public Resumer(MtpMediaProvider owner) => _owner = owner;
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            if (owner != null)
+            {
+                Interlocked.Decrement(ref owner._suspendCount);
+            }
+        }
+    }
+
     private static List<MediaDevice> EnumerateAllDevices()
     {
         var result = new List<MediaDevice>();
@@ -212,6 +235,11 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
                     while (!ct.IsCancellationRequested)
                     {
                         await Task.Delay(5000, ct).ConfigureAwait(false);
+                        if (Volatile.Read(ref _suspendCount) > 0)
+                        {
+                            continue; // 传输中：不枚举设备
+                        }
+
                         var current = await GetDevicesAsync(ct).ConfigureAwait(false);
                         var ids = current.Select(d => d.DeviceId).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -228,9 +256,17 @@ public sealed class MtpMediaProvider : IMediaProvider, IDisposable
                         _lastDeviceIds = ids;
                     }
                 }
-                catch
+                catch (OperationCanceledException)
                 {
-                    // 轮询中断不致命
+                    // 正常退出
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("设备轮询中断（插拔检测将停止，可点「重新扫描」）", ex);
+                    lock (_gate)
+                    {
+                        _pollerTask = null; // 下次调用 GetDevicesAsync 时重启轮询
+                    }
                 }
             }, ct);
         }

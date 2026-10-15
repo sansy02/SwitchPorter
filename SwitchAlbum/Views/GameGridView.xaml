@@ -55,16 +55,15 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="{x:Static res:Strings.Btn_SelectUnsaved}"
+                            Command="{Binding DataContext.SelectUnsavedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            Style="{StaticResource SubtleButtonStyle}" Padding="10,5" FontSize="12"/>
                     <Button Content="{x:Static res:Strings.Btn_SelectAll}"
                             Command="{Binding DataContext.SelectAllCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            Style="{StaticResource SubtleButtonStyle}" Padding="10,5" FontSize="12"/>
+                            Style="{StaticResource SubtleButtonStyle}" Padding="10,5" FontSize="12" Margin="8,0,0,0"/>
                     <Button Content="{x:Static res:Strings.Btn_DeselectAll}"
                             Command="{Binding DataContext.DeselectAllCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             Style="{StaticResource SubtleButtonStyle}" Padding="10,5" FontSize="12" Margin="8,0,0,0"/>
-                    <Button Content="{x:Static res:Strings.Btn_SaveSelected}"
-                            Command="{Binding DataContext.SaveSelectedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            IsEnabled="{Binding CanSaveSelected}"
-                            Style="{StaticResource PrimaryButtonStyle}" Margin="12,0,0,0" Padding="12,5" FontSize="12"/>
                 </StackPanel>
             </Grid>
         </Border>

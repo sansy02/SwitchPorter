@@ -31,11 +31,36 @@
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <!-- 可用 / 不可用之间缓慢过渡（底部操作栏选中照片后按钮「醒来」） -->
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="Opacity"
+                                                         To="0.4" Duration="0:0:0.22"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="Opacity"
+                                                         To="1" Duration="0:0:0.32">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Opacity" Value="0.78"/>
+                            <Setter TargetName="Bd" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="0.97" ScaleY="0.97"/>
+                                </Setter.Value>
+                            </Setter>
+                            <Setter TargetName="Bd" Property="RenderTransformOrigin" Value="0.5,0.5"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -104,6 +129,37 @@
         </Style.Triggers>
     </Style>
 
+    <!-- 来源分段标签（顶栏）：背景由滑动的紫色胶囊提供，这里只负责文字颜色。Tag=True 表示当前来源 -->
+    <Style x:Key="SegmentTabStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="Padding" Value="18,7"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            </Trigger>
+            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                <Setter Property="Foreground" Value="White"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- 去处按钮（底部操作栏，次要）：紫色描边 -->
+    <Style x:Key="DestinationButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource PurpleBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
+        <Setter Property="BorderThickness" Value="1.2"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PurpleSoftBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- 灯箱翻页/关闭按钮 -->
     <Style x:Key="LightboxButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
         <Setter Property="Background" Value="Transparent"/>
@@ -124,17 +180,49 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
-                    <Grid>
-                        <Border x:Name="Box" CornerRadius="11" Background="#B3000000"
-                                BorderBrush="White" BorderThickness="1.6"/>
+                    <Grid x:Name="Root" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="RootScale"/>
+                        </Grid.RenderTransform>
+                        <Border x:Name="Box" CornerRadius="11" Background="#99000000"
+                                BorderBrush="#E6FFFFFF" BorderThickness="1.6"/>
                         <Path x:Name="Tick" Data="M 6,11 L 10,15 L 16,7" Stroke="White" StrokeThickness="2.4"
                               StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Visibility="Collapsed"/>
+                              Opacity="0"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Box" Property="Background" Value="{DynamicResource AccentBrush}"/>
-                            <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="White"/>
+                            <Trigger.EnterActions>
+                                <!-- 勾选时轻轻「弹」一下 -->
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="RootScale" Storyboard.TargetProperty="ScaleX"
+                                                         From="0.72" To="1" Duration="0:0:0.32">
+                                            <DoubleAnimation.EasingFunction>
+                                                <BackEase EasingMode="EaseOut" Amplitude="0.5"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="RootScale" Storyboard.TargetProperty="ScaleY"
+                                                         From="0.72" To="1" Duration="0:0:0.32">
+                                            <DoubleAnimation.EasingFunction>
+                                                <BackEase EasingMode="EaseOut" Amplitude="0.5"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Tick" Storyboard.TargetProperty="Opacity"
+                                                         To="1" Duration="0:0:0.16"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Tick" Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.12"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -142,20 +230,67 @@
         </Setter>
     </Style>
 
-    <!-- 细进度条 -->
+    <!-- 细进度条：紫色渐变 + 缓慢流过的一道光（传输中） -->
     <Style x:Key="ThinProgressBarStyle" TargetType="ProgressBar">
         <Setter Property="Height" Value="6"/>
         <Setter Property="Background" Value="{DynamicResource ProgressTrackBrush}"/>
-        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ProgressFillBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ProgressBar">
                     <Grid>
                         <Border Background="{TemplateBinding Background}" CornerRadius="3"/>
-                        <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}"
-                                CornerRadius="3" HorizontalAlignment="Left"/>
+                        <Border x:Name="PART_Track"/>
+                        <Grid x:Name="PART_Indicator" HorizontalAlignment="Left" ClipToBounds="True">
+                            <Border Background="{TemplateBinding Foreground}" CornerRadius="3"/>
+                            <Rectangle Width="70" HorizontalAlignment="Left" RadiusX="3" RadiusY="3">
+                                <Rectangle.Fill>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#00FFFFFF" Offset="0"/>
+                                        <GradientStop Color="#66FFFFFF" Offset="0.5"/>
+                                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Rectangle.Fill>
+                                <Rectangle.RenderTransform>
+                                    <TranslateTransform x:Name="Sheen" X="-80"/>
+                                </Rectangle.RenderTransform>
+                            </Rectangle>
+                        </Grid>
+                        <!-- 不确定进度（扫描中）：一段光在轨道里来回 -->
+                        <Grid x:Name="IndeterminateRoot" ClipToBounds="True" Visibility="Collapsed">
+                            <Border Width="60" HorizontalAlignment="Left" CornerRadius="3"
+                                    Background="{TemplateBinding Foreground}">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="Runner" X="-60"/>
+                                </Border.RenderTransform>
+                            </Border>
+                        </Grid>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever">
+                                    <DoubleAnimation Storyboard.TargetName="Sheen" Storyboard.TargetProperty="X"
+                                                     From="-80" To="260" Duration="0:0:1.8" BeginTime="0:0:0.4">
+                                        <DoubleAnimation.EasingFunction>
+                                            <SineEase EasingMode="EaseInOut"/>
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                    <DoubleAnimation Storyboard.TargetName="Runner" Storyboard.TargetProperty="X"
+                                                     From="-60" To="220" Duration="0:0:1.4" AutoReverse="True">
+                                        <DoubleAnimation.EasingFunction>
+                                            <SineEase EasingMode="EaseInOut"/>
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <Trigger Property="IsIndeterminate" Value="True">
+                            <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="IndeterminateRoot" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

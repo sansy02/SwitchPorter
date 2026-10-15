@@ -1,25 +1,12 @@
-using System.Windows;
 using System.Windows.Controls;
-using SwitchAlbum.ViewModels;
 
 namespace SwitchAlbum.Views;
 
+/// <summary>已废弃：Switch 与电脑来源现在共用 GameGridView。此文件可以删除。</summary>
 public partial class LocalGameGridView : UserControl
 {
     public LocalGameGridView()
     {
         InitializeComponent();
-    }
-
-    private void GridList_SizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        if (DataContext is not GameGridViewModel viewModel)
-        {
-            return;
-        }
-
-        // 卡片 212 + 边距 8 = 220
-        var columns = Math.Max(2, (int)((GridList.ActualWidth - 28) / 220));
-        viewModel.SetColumns(columns);
     }
 }

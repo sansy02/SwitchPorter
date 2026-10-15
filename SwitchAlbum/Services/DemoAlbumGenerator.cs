@@ -96,9 +96,12 @@ public static class DemoAlbumGenerator
     private static void WriteFakeVideo(string path, DateTime timestamp)
     {
         // 仅演示用：不是可播放的 mp4，保存/重命名/去重流程与真实视频一致
+        // 前 8 字节模拟 mp4 的 ftyp box 头，使完整性校验（MediaVerifier）与真机文件一致
         var bytes = new byte[64 * 1024];
+        var box = new byte[] { 0x00, 0x00, 0x00, 0x18, (byte)'f', (byte)'t', (byte)'y', (byte)'p', (byte)'m', (byte)'p', (byte)'4', (byte)'2' };
+        Array.Copy(box, bytes, box.Length);
         var header = Encoding.ASCII.GetBytes(timestamp.ToString("yyyyMMddHHmmss") + " mock video");
-        Array.Copy(header, bytes, header.Length);
+        Array.Copy(header, 0, bytes, box.Length, header.Length);
         File.WriteAllBytes(path, bytes);
     }
 

@@ -505,6 +505,303 @@ AddAsync("iPhone 网页: 首页与 ZIP 批量下载", async () =>
     finally { Directory.Delete(root, recursive: true); }
 });
 
+// ---------- v1.1: 去重记录与实际文件一致 ----------
+const string SwitchName = "2025031118460900-02CB906EA538A35643C1E1484C4B947D.jpg";
+
+Add("去重: Switch 原始文件名与游戏名无关（换语言/改名不重复保存）", () =>
+{
+    var file = TempFile();
+    try
+    {
+        var t1 = new DuplicateTracker(file);
+        t1.MarkSaved("塞尔达传说 王国之泪", SwitchName, "x.jpg", toPc: true, toPhone: false);
+        t1.Flush();
+        var t2 = new DuplicateTracker(file);
+        return t2.GetState("ゼルダの伝説 ティアーズ オブ ザ キングダム", SwitchName) == SavedState.SavedToPc;
+    }
+    finally { File.Delete(file); }
+});
+
+Add("去重: 旧版键（游戏名|文件名）自动迁移", () =>
+{
+    var file = TempFile();
+    try
+    {
+        File.WriteAllText(file, "{\"游戏A|" + SwitchName + "\":{\"Id\":\"游戏A|" + SwitchName + "\",\"GameTitle\":\"游戏A\",\"FileName\":\"" + SwitchName + "\",\"SavedToPc\":true}}");
+        var t = new DuplicateTracker(file);
+        return t.GetState("游戏B", SwitchName) == SavedState.SavedToPc && t.Count == 1;
+    }
+    finally { File.Delete(file); }
+});
+
+Add("去重: 电脑上的文件被删除后不再算「已保存」", () =>
+{
+    var file = TempFile();
+    var saved = Path.Combine(Path.GetTempPath(), "sab-test-" + Guid.NewGuid().ToString("N") + ".jpg");
+    try
+    {
+        File.WriteAllBytes(saved, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+        var t = new DuplicateTracker(file);
+        var item = Item("游戏A", SwitchName, new DateTime(2025, 3, 11));
+        t.MarkSavedToPc(item, saved);
+        var before = t.IsOnPc(item) && t.GetState(item) == SavedState.SavedToPc;
+        File.Delete(saved);
+        var after = !t.IsOnPc(item) && t.GetState(item) == SavedState.NotSaved;
+        return before && after;
+    }
+    finally { File.Delete(file); if (File.Exists(saved)) File.Delete(saved); }
+});
+
+Add("去重: 按手机区分，换手机不会被误跳过", () =>
+{
+    var file = TempFile();
+    try
+    {
+        var t = new DuplicateTracker(file);
+        var item = Item("游戏A", SwitchName, new DateTime(2025, 3, 11));
+        t.MarkSavedToPhone(item, "phone-1", "20250311_游戏A_001.jpg");
+        return t.GetPhoneFileName(item, "phone-1") == "20250311_游戏A_001.jpg"
+            && t.GetPhoneFileName(item, "phone-2") == null
+            && t.GetState(item) == SavedState.SavedToPhone;
+    }
+    finally { File.Delete(file); }
+});
+
+Add("去重: 清除记录", () =>
+{
+    var file = TempFile();
+    try
+    {
+        var t = new DuplicateTracker(file);
+        t.MarkSaved("游戏A", "a.jpg", null, toPc: true, toPhone: false);
+        t.ClearAll();
+        return t.Count == 0 && new DuplicateTracker(file).Count == 0;
+    }
+    finally { File.Delete(file); }
+});
+
+// ---------- v1.1: 手机存储卷选择 ----------
+Add("手机存储: 有 SD 卡时选内部存储", () =>
+    PhoneSaveService.PickStorageRoot(new[] { "SD 卡", "内部共享存储空间" }) == "内部共享存储空间"
+    && PhoneSaveService.PickStorageRoot(new[] { "SD card", "Internal shared storage" }) == "Internal shared storage"
+    && PhoneSaveService.PickStorageRoot(new[] { "Phone", "Card" }) == "Phone");
+Add("手机存储: 只有一个卷时直接用", () =>
+    PhoneSaveService.PickStorageRoot(new[] { "内部存储" }) == "内部存储"
+    && PhoneSaveService.PickStorageRoot(new[] { "SD 卡" }) == "SD 卡"
+    && PhoneSaveService.PickStorageRoot(Array.Empty<string>()) == null);
+
+// ---------- v1.1: 完整性校验 ----------
+Add("校验: JPG/PNG/MP4 文件头", () =>
+    MediaVerifier.HasValidHeader(".jpg", new byte[] { 0xFF, 0xD8, 0xFF, 0xE1 })
+    && !MediaVerifier.HasValidHeader(".jpg", new byte[] { 0x00, 0x00, 0x00, 0x00 })
+    && MediaVerifier.HasValidHeader(".png", new byte[] { 0x89, 0x50, 0x4E, 0x47 })
+    && MediaVerifier.HasValidHeader(".mp4", new byte[] { 0, 0, 0, 0x18, (byte)'f', (byte)'t', (byte)'y', (byte)'p' })
+    && !MediaVerifier.HasValidHeader(".mp4", new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 }));
+Add("校验: 空文件与大小不一致都判失败", () =>
+{
+    var path = Path.Combine(Path.GetTempPath(), "sab-test-" + Guid.NewGuid().ToString("N") + ".jpg");
+    try
+    {
+        File.WriteAllBytes(path, Array.Empty<byte>());
+        var empty = MediaVerifier.Verify(path, 0) != null;
+        File.WriteAllBytes(path, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 1, 2 });
+        var ok = MediaVerifier.Verify(path, 0) == null && MediaVerifier.Verify(path + ".part", 0) != null;
+        var sizeMismatch = MediaVerifier.Verify(path, 999) != null;
+        return empty && ok && sizeMismatch;
+    }
+    finally { File.Delete(path); }
+});
+
+// ---------- v1.1: HTTP Range ----------
+Add("Range: 常见格式", () =>
+    IphoneWebServer.TryParseRange("bytes=0-1", 100, out var s1, out var e1) && s1 == 0 && e1 == 1
+    && IphoneWebServer.TryParseRange("bytes=10-", 100, out var s2, out var e2) && s2 == 10 && e2 == 99
+    && IphoneWebServer.TryParseRange("bytes=-20", 100, out var s3, out var e3) && s3 == 80 && e3 == 99
+    && IphoneWebServer.TryParseRange("bytes=50-500", 100, out var s4, out var e4) && s4 == 50 && e4 == 99
+    && !IphoneWebServer.TryParseRange("bytes=200-", 100, out _, out _)
+    && !IphoneWebServer.TryParseRange("bytes=0-1,5-6", 100, out _, out _));
+
+// ---------- v1.1: 集成 ----------
+AddAsync("模拟: 删除电脑上的文件后可以重新保存", async () =>
+{
+    var root = TempDir();
+    try
+    {
+        DemoAlbumGenerator.Generate(root);
+        var outDir = Path.Combine(root, "out");
+        var provider = new MockMediaProvider(root, Path.Combine(root, "phone"));
+        var tracker = new DuplicateTracker(Path.Combine(root, "saved.json"));
+        var save = new SaveService(tracker);
+        var devices = await provider.GetDevicesAsync(default);
+        await using var session = await provider.ConnectAsync(devices.Single(d => d.IsSwitch), default);
+        var scan = await AlbumScanner.ScanAsync(session, null, default);
+        if (scan == null)
+        {
+            return false;
+        }
+
+        var r1 = await save.SaveToPcAsync(scan.AllItems, session, outDir, autoRename: true, null, default);
+        Directory.Delete(outDir, recursive: true);   // 用户手动删掉了
+        var r2 = await save.SaveToPcAsync(scan.AllItems, session, outDir, autoRename: true, null, default);
+        var files = Directory.GetFiles(outDir, "*", SearchOption.AllDirectories).Length;
+        return r1.SavedCount == scan.AllItems.Count
+            && r2.SavedCount == scan.AllItems.Count && r2.SkippedCount == 0
+            && files == scan.AllItems.Count;
+    }
+    finally { Directory.Delete(root, recursive: true); }
+});
+
+AddAsync("模拟: Switch 直传手机，第二次跳过，换手机重新传", async () =>
+{
+    var root = TempDir();
+    try
+    {
+        DemoAlbumGenerator.Generate(root);
+        var provider = new MockMediaProvider(root, Path.Combine(root, "phone"));
+        var tracker = new DuplicateTracker(Path.Combine(root, "saved.json"));
+        var phoneSave = new PhoneSaveService(tracker, new SettingsService(Path.Combine(root, "settings.json")));
+        var devices = await provider.GetDevicesAsync(default);
+        await using var switchSession = await provider.ConnectAsync(devices.Single(d => d.IsSwitch), default);
+        var phoneDevice = (await provider.GetPhoneCandidateDevicesAsync(default)).Single();
+        await using var phoneSession = await provider.ConnectAsync(phoneDevice, default);
+        var scan = await AlbumScanner.ScanAsync(switchSession, null, default);
+        if (scan == null)
+        {
+            return false;
+        }
+
+        var r1 = await phoneSave.SaveToPhoneAsync(scan.AllItems, switchSession, phoneSession, true, null, default, "phone-A");
+        var r2 = await phoneSave.SaveToPhoneAsync(scan.AllItems, switchSession, phoneSession, true, null, default, "phone-A");
+        var r3 = await phoneSave.SaveToPhoneAsync(scan.AllItems, switchSession, phoneSession, true, null, default, "phone-B");
+
+        // 电脑上没有留任何副本（直传）
+        var pcCopies = Directory.Exists(Path.Combine(root, "out"));
+        return r1.SavedCount == scan.AllItems.Count
+            && r2.SkippedCount == scan.AllItems.Count && r2.SavedCount == 0
+            && r3.SavedCount == scan.AllItems.Count
+            && !pcCopies;
+    }
+    finally { Directory.Delete(root, recursive: true); }
+});
+
+AddAsync("iPhone 网页: 分享指定文件 + 缩略图 + Range 206", async () =>
+{
+    var root = TempDir();
+    try
+    {
+        DemoAlbumGenerator.Generate(root);
+        var provider = new MockMediaProvider(root, Path.Combine(root, "phone"));
+        var devices = await provider.GetDevicesAsync(default);
+        await using var switchSession = await provider.ConnectAsync(devices.Single(d => d.IsSwitch), default);
+        var scan = await AlbumScanner.ScanAsync(switchSession, null, default);
+        if (scan == null)
+        {
+            return false;
+        }
+
+        // Switch 直传：下载到临时目录再分享
+        var share = new IphoneShareService(Path.Combine(root, "share"));
+        var picked = scan.AllItems.Take(5).ToList();
+        var (files, result) = await share.PrepareFromDeviceAsync(picked, switchSession, true, null, default);
+        if (files.Count != picked.Count || result.Failed.Count != 0)
+        {
+            return false;
+        }
+
+        using var server = new IphoneWebServer(ip: "127.0.0.1", startPort: 53811);
+        server.ShareFiles(files);
+        server.Start();
+        using var http = new HttpClient();
+        var homeText = await http.GetStringAsync(server.Url);
+        var token = new Uri(server.Url).Query[3..];
+
+        var ids = System.Text.RegularExpressions.Regex.Matches(homeText, "/f\\?id=([0-9a-f]+)")
+            .Select(m => m.Groups[1].Value).Distinct().ToList();
+        if (ids.Count != picked.Count)
+        {
+            return false;
+        }
+
+        var baseUrl = $"http://127.0.0.1:{server.Port}";
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/f?id={ids[0]}&t={token}");
+        request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 1);
+        var ranged = await http.SendAsync(request);
+        var rangedBytes = await ranged.Content.ReadAsByteArrayAsync();
+        var rangeOk = ranged.StatusCode == System.Net.HttpStatusCode.PartialContent && rangedBytes.Length == 2;
+
+        var thumbIds = System.Text.RegularExpressions.Regex.Matches(homeText, "/thumb\\?id=([0-9a-f]+)")
+            .Select(m => m.Groups[1].Value).ToList();
+        var thumbOk = true;
+        if (thumbIds.Count > 0)
+        {
+            var thumb = await http.GetAsync($"{baseUrl}/thumb?id={thumbIds[0]}&t={token}");
+            thumbOk = thumb.StatusCode == System.Net.HttpStatusCode.OK
+                && thumb.Content.Headers.ContentType?.MediaType == "image/jpeg";
+        }
+
+        var unknown = await http.GetAsync($"{baseUrl}/f?id=deadbeefdeadbeef&t={token}");
+        share.Cleanup();
+        return rangeOk && thumbOk && unknown.StatusCode == System.Net.HttpStatusCode.NotFound
+            && !Directory.Exists(Path.Combine(root, "share"));
+    }
+    finally { Directory.Delete(root, recursive: true); }
+});
+
+// ---------- Switch 2 游戏（在线更新 / 内置快照） ----------
+Add("NS2: 内置快照可读取且含马力欧卡丁车 世界", () =>
+{
+    var updater = new OnlineTitleUpdater(Path.Combine(Path.GetTempPath(), "sab-test-" + Guid.NewGuid().ToString("N") + ".json"));
+    var local = updater.LoadLocal();
+    return local.Count >= 600 && local.Any(e => e.Ja == "マリオカート ワールド" && e.Zht == "瑪利歐賽車 世界" && e.Icon != null);
+});
+
+Add("NS2: 合并后中文/日文/英文文件夹名都能找到封面", () =>
+{
+    var db = TitleDbService.LoadEmbedded()!;
+    var before = db.GetTitleIdByFolderName("马力欧卡丁车 世界");
+    var updater = new OnlineTitleUpdater(Path.Combine(Path.GetTempPath(), "sab-test-" + Guid.NewGuid().ToString("N") + ".json"));
+    var added = db.Merge(OnlineTitleUpdater.ToTitles(updater.LoadLocal()));
+    var zhs = db.GetTitleIdByFolderName("马力欧卡丁车 世界");
+    var zht = db.GetTitleIdByFolderName("瑪利歐賽車 世界");
+    var ja = db.GetTitleIdByFolderName("マリオカート ワールド");
+    var en = db.GetTitleIdByFolderName("Mario Kart World");
+    var dk = db.GetTitleIdByFolderName("咚奇刚 蕉力全开");
+    var splat = db.GetTitleIdByFolderName("斯普拉遁 塗擊隊");
+    // Switch 1 游戏不受影响
+    var totk = db.GetTitleIdByFolderName("塞尔达传说 王国之泪");
+    Console.WriteLine($"  NS2 新增 {added} 款; 卡丁车={zhs}");
+    Console.WriteLine($"  合并前 卡丁车 世界 → {before ?? "无"}");
+    return added >= 600
+        // 内置库里已有的 NS2 游戏（如马力欧卡丁车 世界）优先用内置 TitleId，其余用在线数据
+        && zhs != null && zhs == zht && zhs == ja && zhs == en
+        && dk != null && db.GetCoverUrls(dk).Count >= 1 && splat != null && splat.StartsWith("ns2-")
+        && db.GetCoverUrls(zhs).Count >= 1 && db.GetCoverUrls(splat)[0].StartsWith("https://img-eshop.cdn.nintendo.net/i/")
+        && totk == "0100F2C0115B6000";
+});
+
+// ---------- 联网诊断（只打印结果，不影响通过与否） ----------
+AddAsync("诊断: 任天堂封面 CDN 与 Switch 2 在线列表是否可访问", async () =>
+{
+    var dir = TempDir();
+    try
+    {
+        var covers = new CoverService(Path.Combine(dir, "covers"));
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var cover = await covers.ResolveAsync("0400C3F00006E000", "马力欧卡丁车 世界",
+            new[] { "https://img-eshop.cdn.nintendo.net/i/f881a2ef02b5e87cd52bdbc9713ac2b72c78dba9a6a050ba78389b846993ab2a.jpg" }, default);
+        Console.WriteLine($"  封面 CDN: {(cover != null ? "可访问" : "失败")}（{sw.ElapsedMilliseconds} ms）");
+
+        sw.Restart();
+        var updater = new OnlineTitleUpdater(Path.Combine(dir, "ns2.json"));
+        var list = await updater.RefreshAsync(Array.Empty<Ns2Entry>(), default);
+        Console.WriteLine($"  在线列表: {(list != null ? list.Count + " 款" : "失败")}（{sw.ElapsedMilliseconds} ms）");
+        var withZh = list?.Count(e => e.Zht != null) ?? 0;
+        Console.WriteLine($"  其中取到繁中名: {withZh} 款");
+        return true;
+    }
+    finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+});
+
 // ---------- 运行 ----------
 var passed = 0;
 foreach (var (name, run) in tests)

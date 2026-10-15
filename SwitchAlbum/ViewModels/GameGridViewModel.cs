@@ -12,7 +12,7 @@ public enum GridSortMode
     OldestFirst,
 }
 
-/// <summary>单个游戏（或全部）的照片网格。行分块 + ListBox 虚拟化，支持按拍摄时间排序。</summary>
+/// <summary>单个游戏（或全部）的照片网格。行分块 + ListBox 虚拟化，支持按拍摄时间排序。Switch 与电脑来源共用。</summary>
 public partial class GameGridViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
@@ -108,8 +108,18 @@ public partial class GameGridViewModel : ObservableObject
     private void OnItemSelectionChanged(object? sender, bool selected)
     {
         SelectedCount = Math.Max(0, SelectedCount + (selected ? 1 : -1));
-        SelectedText = string.Format(Strings.Lbl_Selected, SelectedCount);
+        SelectedText = SelectedCount > 0 ? string.Format(Strings.Lbl_Selected, SelectedCount) : "";
         CanSaveSelected = SelectedCount > 0;
+        _main.OnGridSelectionChanged(this);
+    }
+
+    /// <summary>只勾选满足条件的照片（其余取消勾选）。</summary>
+    public void SelectWhere(Func<AlbumItem, bool> predicate)
+    {
+        foreach (var item in _items)
+        {
+            item.IsSelected = predicate(item.Item);
+        }
     }
 
     public IReadOnlyList<AlbumItem> SelectedItems()

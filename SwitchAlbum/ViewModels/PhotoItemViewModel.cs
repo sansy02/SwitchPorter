@@ -32,6 +32,17 @@ public sealed partial class PhotoItemViewModel : ObservableObject
 
     partial void OnIsSelectedChanged(bool value) => SelectionChanged?.Invoke(this, value);
 
+    /// <summary>「已存电脑 / 已存手机 / 电脑+手机」徽标文字。</summary>
+    public string SavedText => SavedState switch
+    {
+        SavedState.SavedToPc => Resources.Strings.Badge_OnPc,
+        SavedState.SavedToPhone => Resources.Strings.Badge_OnPhone,
+        SavedState.SavedBoth => Resources.Strings.Badge_OnBoth,
+        _ => "",
+    };
+
+    partial void OnSavedStateChanged(SavedState value) => OnPropertyChanged(nameof(SavedText));
+
     public void RefreshSaved()
     {
         SavedState = Item.Saved;

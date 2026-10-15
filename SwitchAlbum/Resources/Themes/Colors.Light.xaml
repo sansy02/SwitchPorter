@@ -1,23 +1,46 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F3F4F6"/>
-    <SolidColorBrush x:Key="TopBarBackgroundBrush" Color="#FFFFFF"/>
+    <!-- 紫色体系：深紫黑 / 灰紫 / 冷紫为底，只有最重要的操作用亮紫。不用霓虹紫、不用渐变堆叠。 -->
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F5F3F9"/>
+    <SolidColorBrush x:Key="TopBarBackgroundBrush" Color="#FCFBFE"/>
     <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#F7F8FA"/>
-    <SolidColorBrush x:Key="ChipBackgroundBrush" Color="#ECEEF2"/>
-    <SolidColorBrush x:Key="BorderBrush" Color="#E2E5EA"/>
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1F2328"/>
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#667085"/>
-    <SolidColorBrush x:Key="AccentBrush" Color="#E60012"/>
-    <SolidColorBrush x:Key="AccentHoverBrush" Color="#C9000F"/>
-    <SolidColorBrush x:Key="AccentSoftBrush" Color="#22E60012"/>
-    <SolidColorBrush x:Key="PurpleBrush" Color="#6C3BF4"/>
-    <SolidColorBrush x:Key="PurpleHoverBrush" Color="#5A2FE0"/>
-    <SolidColorBrush x:Key="PurpleSoftBrush" Color="#F3EEFF"/>
-    <SolidColorBrush x:Key="DeviceDotBrush" Color="#16A34A"/>
-    <SolidColorBrush x:Key="DeviceDotOffBrush" Color="#DC2626"/>
-    <SolidColorBrush x:Key="SuccessBrush" Color="#107C10"/>
-    <SolidColorBrush x:Key="ProgressTrackBrush" Color="#E2E5EA"/>
-    <SolidColorBrush x:Key="ToastBackgroundBrush" Color="#E6202020"/>
-    <SolidColorBrush x:Key="OverlayBrush" Color="#CC000000"/>
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#F4F0FB"/>
+    <SolidColorBrush x:Key="ChipBackgroundBrush" Color="#EEEAF5"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="#E4DFEE"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1E1A29"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#6E6782"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#6A4BD8"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#5A3CC4"/>
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#1F6A4BD8"/>
+    <SolidColorBrush x:Key="PurpleBrush" Color="#6A4BD8"/>
+    <SolidColorBrush x:Key="PurpleHoverBrush" Color="#5A3CC4"/>
+    <SolidColorBrush x:Key="PurpleSoftBrush" Color="#EFEAFC"/>
+    <SolidColorBrush x:Key="DeviceDotBrush" Color="#3BA67A"/>
+    <SolidColorBrush x:Key="DeviceDotOffBrush" Color="#C9576B"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="#3E8F6E"/>
+    <SolidColorBrush x:Key="ProgressTrackBrush" Color="#E4DFEE"/>
+    <SolidColorBrush x:Key="ToastBackgroundBrush" Color="#F01E1A29"/>
+    <SolidColorBrush x:Key="OverlayBrush" Color="#E60D0B12"/>
+    <Color x:Key="AccentColor">#6A4BD8</Color>
+    <Color x:Key="AccentGlowColor">#7C5CF0</Color>
+    <!-- 缩略图/封面加载前的占位 -->
+    <LinearGradientBrush x:Key="PlaceholderBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#EFEBF6" Offset="0"/>
+        <GradientStop Color="#DCD5E8" Offset="1"/>
+    </LinearGradientBrush>
+    <!-- 进度条：冷紫 → 亮紫 -->
+    <LinearGradientBrush x:Key="ProgressFillBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#7B62D9" Offset="0"/>
+        <GradientStop Color="#A68CFF" Offset="1"/>
+    </LinearGradientBrush>
+    <!-- 空状态场景（月、远山、雾） -->
+    <Color x:Key="SceneSkyTopColor">#F5F3F9</Color>
+    <Color x:Key="SceneSkyBottomColor">#E9E3F3</Color>
+    <Color x:Key="SceneMoonColor">#FFFFFF</Color>
+    <Color x:Key="SceneMoonHaloColor">#C9B8F2</Color>
+    <SolidColorBrush x:Key="SceneFarRidgeBrush" Color="#DCD4EA"/>
+    <SolidColorBrush x:Key="SceneMidRidgeBrush" Color="#CBC1DE"/>
+    <SolidColorBrush x:Key="SceneNearRidgeBrush" Color="#B7ABCF"/>
+    <SolidColorBrush x:Key="SceneMistBrush" Color="#F5F3F9"/>
+    <SolidColorBrush x:Key="SceneFigureBrush" Color="#4A3F63"/>
 </ResourceDictionary>

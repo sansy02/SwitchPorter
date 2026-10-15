@@ -1,0 +1,105 @@
+<!--
+    空状态场景：没有照片可看时（未连接 Switch / 相册为空 / 电脑里还没有照片）显示。
+    巨大安静的世界里一个很小的人：月、三层远山、缓慢流动的雾、极慢的镜头推近。
+    只用主题色（深色主题为深紫黑夜，浅色主题为灰紫晨雾），所有动作都很慢。
+-->
+<UserControl x:Class="SwitchAlbum.Controls.EmptyScene"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             IsHitTestVisible="False" Focusable="False">
+    <UserControl.Resources>
+        <Storyboard x:Key="Ambient" RepeatBehavior="Forever">
+            <!-- 极慢的镜头推近 -->
+            <DoubleAnimation Storyboard.TargetName="Push" Storyboard.TargetProperty="ScaleX"
+                             From="1" To="1.045" Duration="0:0:40" AutoReverse="True">
+                <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="Push" Storyboard.TargetProperty="ScaleY"
+                             From="1" To="1.045" Duration="0:0:40" AutoReverse="True">
+                <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <!-- 月晕呼吸 -->
+            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity"
+                             From="0.55" To="0.9" Duration="0:0:9" AutoReverse="True">
+                <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <!-- 两层雾以不同速度漂移：视差 -->
+            <DoubleAnimation Storyboard.TargetName="MistFarShift" Storyboard.TargetProperty="X"
+                             From="-70" To="130" Duration="0:0:50" AutoReverse="True">
+                <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="MistNearShift" Storyboard.TargetProperty="X"
+                             From="90" To="-110" Duration="0:1:10" AutoReverse="True">
+                <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="MistNear" Storyboard.TargetProperty="Opacity"
+                             From="0.35" To="0.6" Duration="0:0:23" AutoReverse="True"/>
+        </Storyboard>
+    </UserControl.Resources>
+
+    <Viewbox Stretch="UniformToFill" ClipToBounds="True">
+        <Canvas Width="1200" Height="620" RenderTransformOrigin="0.62,0.4">
+            <Canvas.RenderTransform>
+                <ScaleTransform x:Name="Push"/>
+            </Canvas.RenderTransform>
+
+            <!-- 天 -->
+            <Rectangle Width="1200" Height="620">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="{DynamicResource SceneSkyTopColor}" Offset="0"/>
+                        <GradientStop Color="{DynamicResource SceneSkyBottomColor}" Offset="0.75"/>
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
+            <!-- 月晕 + 月 -->
+            <Ellipse x:Name="Halo" Width="360" Height="360" Canvas.Left="640" Canvas.Top="10" Opacity="0.7">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="{DynamicResource SceneMoonHaloColor}" Offset="0"/>
+                        <GradientStop Color="Transparent" Offset="1"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+            <Ellipse Width="76" Height="76" Canvas.Left="782" Canvas.Top="152" Opacity="0.95">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.38,0.35">
+                        <GradientStop Color="{DynamicResource SceneMoonColor}" Offset="0"/>
+                        <GradientStop Color="{DynamicResource SceneMoonHaloColor}" Offset="1.25"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+
+            <!-- 远山 -->
+            <Path Fill="{DynamicResource SceneFarRidgeBrush}"
+                  Data="M0,430 C150,380 260,400 380,370 C520,335 600,390 760,360 C900,335 1040,380 1200,350 L1200,620 L0,620 Z"/>
+
+            <!-- 远雾 -->
+            <Ellipse Width="980" Height="80" Canvas.Left="-120" Canvas.Top="392" Fill="{DynamicResource SceneMistBrush}" Opacity="0.55">
+                <Ellipse.Effect><BlurEffect Radius="44" RenderingBias="Performance"/></Ellipse.Effect>
+                <Ellipse.RenderTransform><TranslateTransform x:Name="MistFarShift"/></Ellipse.RenderTransform>
+            </Ellipse>
+
+            <!-- 中山 -->
+            <Path Fill="{DynamicResource SceneMidRidgeBrush}"
+                  Data="M0,500 C120,470 240,480 360,455 C500,425 620,470 780,445 C920,425 1060,470 1200,450 L1200,620 L0,620 Z"/>
+
+            <!-- 近雾 -->
+            <Ellipse x:Name="MistNear" Width="1100" Height="64" Canvas.Left="80" Canvas.Top="470" Fill="{DynamicResource SceneMistBrush}" Opacity="0.45">
+                <Ellipse.Effect><BlurEffect Radius="38" RenderingBias="Performance"/></Ellipse.Effect>
+                <Ellipse.RenderTransform><TranslateTransform x:Name="MistNearShift"/></Ellipse.RenderTransform>
+            </Ellipse>
+
+            <!-- 近山 -->
+            <Path Fill="{DynamicResource SceneNearRidgeBrush}"
+                  Data="M0,560 C160,545 300,552 460,540 C600,530 700,520 820,528 C960,538 1080,555 1200,548 L1200,620 L0,620 Z"/>
+
+            <!-- 很小的人：站在山脊上，背对我们看月亮 -->
+            <Canvas Canvas.Left="736" Canvas.Top="500">
+                <Ellipse Width="5.5" Height="5.5" Canvas.Left="3.2" Canvas.Top="0" Fill="{DynamicResource SceneFigureBrush}"/>
+                <Path Fill="{DynamicResource SceneFigureBrush}" Data="M3,5.6 L8.8,5.6 L10.8,22 L1,22 Z"/>
+            </Canvas>
+        </Canvas>
+    </Viewbox>
+</UserControl>

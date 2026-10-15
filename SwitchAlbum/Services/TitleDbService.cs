@@ -53,7 +53,8 @@ public sealed class TitleDbService : ITitleDb
 
     private readonly Dictionary<string, TitleNames> _byId = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _byName = new(StringComparer.Ordinal);
-    private readonly (string Name, string Tid)[] _byNameEntries;
+    private (string Name, string Tid)[] _byNameEntries;
+    private readonly object _gate = new();
     private readonly Dictionary<string, string[]> _coverUrls = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<char, string> _t2sChar = new();
     private readonly List<(string Key, string Value)> _t2sMulti = new();
@@ -116,12 +117,92 @@ public sealed class TitleDbService : ITitleDb
     }
 
     public string? GetNameByTitleId(string titleId)
-        => _byId.TryGetValue(titleId, out var names) ? names.Best : null;
+    {
+        lock (_gate)
+        {
+            return _byId.TryGetValue(titleId, out var names) ? names.Best : null;
+        }
+    }
 
     public string? GetTitleIdByName(string titleName)
-        => _byName.TryGetValue(Normalize(titleName), out var tid) ? tid : null;
+    {
+        lock (_gate)
+        {
+            return _byName.TryGetValue(Normalize(titleName), out var tid) ? tid : null;
+        }
+    }
+
+    /// <summary>
+    /// 合并在线更新的游戏（目前用于 Switch 2：内置库来自 Switch 1 eShop，没有 NS2 独占游戏）。
+    /// 已有的名称不覆盖（内置库优先），新名称注册并重建包含匹配表。线程安全，可在扫描进行中调用。
+    /// </summary>
+    /// <returns>新增的游戏数量。</returns>
+    public int Merge(IEnumerable<OnlineTitle> titles)
+    {
+        var added = 0;
+        lock (_gate)
+        {
+            foreach (var title in titles)
+            {
+                var names = title.Names.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct().ToList();
+                if (names.Count == 0 || string.IsNullOrEmpty(title.Id))
+                {
+                    continue;
+                }
+
+                if (!_byId.ContainsKey(title.Id))
+                {
+                    added++;
+                }
+
+                // 名称优先级：中文（简/繁）→ 英文 → 日文，用于显示旧式文件夹名
+                var zh = names.FirstOrDefault(ContainsCjkHan) ?? names[0];
+                _byId[title.Id] = new TitleNames(null, zh, names.FirstOrDefault(n => !ContainsCjk(n)), names.FirstOrDefault(ContainsKana));
+
+                if (title.CoverUrls.Count > 0)
+                {
+                    _coverUrls[title.Id] = title.CoverUrls.ToArray();
+                }
+
+                foreach (var name in names)
+                {
+                    RegisterName(name, title.Id);
+
+                    // 「Splatoon Raiders (斯普拉遁 塗擊隊)」这类带括号的名称：括号内外分别注册
+                    var outer = StripTrailingParenthetical(name);
+                    if (outer != name.Trim())
+                    {
+                        RegisterName(outer, title.Id);
+                        var inner = name.Trim()[(outer.Length)..].Trim().Trim('(', ')', '（', '）', '[', ']').Trim();
+                        RegisterName(inner, title.Id);
+                    }
+                }
+            }
+
+            _byNameEntries = _byName
+                .Select(kv => (Name: kv.Key, Tid: kv.Value))
+                .OrderByDescending(e => e.Name.Length)
+                .ToArray();
+        }
+
+        return added;
+    }
+
+    private static bool ContainsKana(string s) => s.Any(c => c is >= '\u3040' and <= '\u30FF');
+
+    private static bool ContainsCjk(string s) => s.Any(c => c is >= '\u3040' and <= '\u9FFF');
+
+    private static bool ContainsCjkHan(string s) => s.Any(c => c is >= '\u4E00' and <= '\u9FFF') && !ContainsKana(s);
 
     public string? GetTitleIdByFolderName(string folderName)
+    {
+        lock (_gate)
+        {
+            return GetTitleIdByFolderNameCore(folderName);
+        }
+    }
+
+    private string? GetTitleIdByFolderNameCore(string folderName)
     {
         if (string.IsNullOrWhiteSpace(folderName))
         {
@@ -252,7 +333,12 @@ public sealed class TitleDbService : ITitleDb
 
     /// <summary>TitleId → 封面候选图直链（按 图标→横幅→盒装 顺序），无则空数组。</summary>
     public IReadOnlyList<string> GetCoverUrls(string titleId)
-        => _coverUrls.TryGetValue(titleId, out var urls) ? urls : Array.Empty<string>();
+    {
+        lock (_gate)
+        {
+            return _coverUrls.TryGetValue(titleId, out var urls) ? urls : Array.Empty<string>();
+        }
+    }
 
     public string? GetIconUrl(string titleId)
         => GetCoverUrls(titleId).FirstOrDefault();
@@ -396,3 +482,6 @@ public sealed class TitleDbService : ITitleDb
         public string? Best => Zh ?? ZhHant ?? En ?? Ja;
     }
 }
+
+/// <summary>在线更新得到的一个游戏：Id（如 "ns2-70010000092842"）、各语言名称、封面直链。</summary>
+public sealed record OnlineTitle(string Id, IReadOnlyList<string> Names, IReadOnlyList<string> CoverUrls);

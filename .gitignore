@@ -4,3 +4,7 @@ publish/
 .vs/
 *.user
 *.suo
+*.log
+commit-msg.txt
+git-push.bat
+.claude/

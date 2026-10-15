@@ -76,16 +76,25 @@ public static class SmokeTest
             ok &= localScan != null && localScan.AllItems.Count == scan.AllItems.Count;
             if (localScan != null)
             {
+                // 与界面一致：把电脑里的文件指回对应的 Switch 原图记录 → 已传过手机的会被跳过，不再出现两份副本
+                var index = tracker.SnapshotPcPathIndex();
+                foreach (var item in localScan.AllItems)
+                {
+                    if (index.TryGetValue(Path.GetFullPath(localSession.ToLocalPath(item.DevicePath)), out var key))
+                    {
+                        item.TrackingKey = key;
+                    }
+                }
+
                 var localSave = await phoneSaveService.SaveToPhoneAsync(
                     localScan.AllItems, localSession, phoneSession, autoRename: true, null, CancellationToken.None);
-                lines.Add($"local-phone saved={localSave.SavedCount} failed={localSave.Failed.Count}");
-                ok &= localSave.SavedCount == localScan.AllItems.Count;
-                // 电脑文件与 Switch 原文件去重键不同，手机端出现两套副本（已知边界）
+                lines.Add($"local-phone saved={localSave.SavedCount} skipped={localSave.SkippedCount} failed={localSave.Failed.Count}");
+                ok &= localSave.SkippedCount == localScan.AllItems.Count && localSave.SavedCount == 0;
                 var phoneFiles2 = Directory.Exists(phoneDcim)
                     ? Directory.GetFiles(phoneDcim, "*", SearchOption.AllDirectories).Length
                     : 0;
                 lines.Add($"phone-files-after-local={phoneFiles2}");
-                ok &= phoneFiles2 == scan.AllItems.Count * 2;
+                ok &= phoneFiles2 == scan.AllItems.Count;
             }
 
             // 封面链路：Switch 2 风格文件夹名模糊反查 → 内置封面包

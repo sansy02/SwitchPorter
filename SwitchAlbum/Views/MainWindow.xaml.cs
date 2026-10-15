@@ -15,6 +15,40 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        SwitchTab.SizeChanged += (_, _) => MoveTabIndicator(animate: false);
+        LibraryTab.SizeChanged += (_, _) => MoveTabIndicator(animate: false);
+    }
+
+    /// <summary>紫色胶囊滑到当前来源标签下面。</summary>
+    private void MoveTabIndicator(bool animate)
+    {
+        if (_main == null || !IsLoaded)
+        {
+            return;
+        }
+
+        var target = _main.IsLibrarySource ? LibraryTab : SwitchTab;
+        if (target.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var x = target.TranslatePoint(new Point(0, 0), SwitchTab).X;
+        if (!animate)
+        {
+            TabIndicatorShift.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, null);
+            TabIndicator.BeginAnimation(WidthProperty, null);
+            TabIndicatorShift.X = x;
+            TabIndicator.Width = target.ActualWidth;
+            return;
+        }
+
+        var duration = TimeSpan.FromMilliseconds(380);
+        var ease = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 4 };
+        TabIndicatorShift.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty,
+            new DoubleAnimation(x, duration) { EasingFunction = ease });
+        TabIndicator.BeginAnimation(WidthProperty,
+            new DoubleAnimation(target.ActualWidth, duration) { EasingFunction = ease });
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -33,9 +67,21 @@ public partial class MainWindow : Window
 
     private void OnMainPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.IsLibrarySource))
+        {
+            MoveTabIndicator(animate: true);
+            return;
+        }
+
         if (e.PropertyName != nameof(MainViewModel.Lightbox))
         {
             return;
+        }
+
+        if (_main?.Lightbox != null)
+        {
+            // 打开大图：从稍小处放大到位
+            AnimateLightboxScale(0.94, 420);
         }
 
         // 灯箱打开/切换时订阅全图加载事件，做 crossfade
@@ -53,6 +99,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        AnimateLightboxScale(0.985, 300);
         LightboxImage.BeginAnimation(OpacityProperty, null);
         LightboxImage.Opacity = 0;
         LightboxImage.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(240))
@@ -61,8 +108,19 @@ public partial class MainWindow : Window
         });
     }
 
+    private void AnimateLightboxScale(double from, int milliseconds)
+    {
+        var ease = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 };
+        var duration = TimeSpan.FromMilliseconds(milliseconds);
+        LightboxScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(from, 1, duration) { EasingFunction = ease });
+        LightboxScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(from, 1, duration) { EasingFunction = ease });
+    }
+
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        _ = Dispatcher.InvokeAsync(() => MoveTabIndicator(animate: false), System.Windows.Threading.DispatcherPriority.Loaded);
         if (_main == null)
         {
             return;
@@ -114,6 +172,14 @@ public partial class MainWindow : Window
         var lightbox = _main?.Lightbox;
         if (lightbox == null)
         {
+            // Ctrl+A：在照片网格里全选（搜索框里输入时不拦截）
+            if (_main != null && e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control
+                && Keyboard.FocusedElement is not System.Windows.Controls.TextBox && _main.IsInGrid)
+            {
+                _main.SelectAllCommand.Execute(null);
+                e.Handled = true;
+            }
+
             return;
         }
 

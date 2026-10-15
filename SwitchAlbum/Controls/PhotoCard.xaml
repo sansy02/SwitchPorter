@@ -8,10 +8,22 @@
         <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
     </UserControl.Resources>
     <Border x:Name="Root" Background="{DynamicResource SurfaceBrush}" CornerRadius="12"
-            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
             ClipToBounds="True" Cursor="Hand"
             MouseEnter="Root_MouseEnter" MouseLeave="Root_MouseLeave"
             MouseLeftButtonDown="Root_MouseLeftButtonDown">
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Style.Triggers>
+                    <!-- 选中：紫色描边 -->
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        <Setter Property="BorderThickness" Value="2"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Border.RenderTransform>
             <ScaleTransform x:Name="RootScale" CenterX="106" CenterY="93"/>
         </Border.RenderTransform>
@@ -23,14 +35,7 @@
 
             <!-- 缩略图 -->
             <Grid Grid.Row="0">
-                <Rectangle>
-                    <Rectangle.Fill>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                            <GradientStop Color="#E8EAED" Offset="0"/>
-                            <GradientStop Color="#CDD2D9" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Rectangle.Fill>
-                </Rectangle>
+                <Rectangle Fill="{DynamicResource PlaceholderBrush}"/>
                 <Image Source="{Binding ThumbPath}" Stretch="UniformToFill"/>
 
                 <!-- 视频徽标 -->
@@ -53,10 +58,36 @@
                     <TextBlock Text="{Binding FileName}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}"
                                TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                 </StackPanel>
-                <TextBlock Text="{x:Static res:Strings.Badge_Saved}" FontSize="10.5"
+                <TextBlock Text="{Binding SavedText}" FontSize="10.5"
                            Foreground="{DynamicResource SuccessBrush}"
                            HorizontalAlignment="Right" VerticalAlignment="Center"
-                           Visibility="{Binding SavedVisible, Converter={StaticResource BoolToVis}}"/>
+                           Visibility="{Binding SavedVisible, Converter={StaticResource BoolToVis}}">
+                    <TextBlock.RenderTransform>
+                        <TranslateTransform/>
+                    </TextBlock.RenderTransform>
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <!-- 刚保存完：标记从右侧轻轻滑入 -->
+                                <Trigger Property="IsVisible" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.45"/>
+                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                                 From="10" To="0" Duration="0:0:0.45">
+                                                    <DoubleAnimation.EasingFunction>
+                                                        <CubicEase EasingMode="EaseOut"/>
+                                                    </DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
         </Grid>
     </Border>

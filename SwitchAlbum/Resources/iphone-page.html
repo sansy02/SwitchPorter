@@ -2,38 +2,45 @@
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Switch 相册</title>
 <style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1c1e21; padding-bottom: 48px; }
-  header { position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid #e4e6ea; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
-  header .count { color: #667085; font-size: 13px; font-weight: 400; }
-  .btn { display: inline-block; background: #6c3bf4; color: #fff; text-decoration: none; padding: 9px 16px; border-radius: 9px; font-size: 14px; font-weight: 600; }
-  .hint { margin: 12px 16px 0; padding: 10px 12px; background: #f0ecff; color: #5b3ac4; border-radius: 10px; font-size: 12.5px; line-height: 1.6; }
-  section { margin: 18px 16px 0; }
-  section h2 { font-size: 15px; margin: 0 0 10px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  section h2 span { color: #667085; font-size: 12px; font-weight: 400; }
-  section h2 .zip { margin-left: auto; font-size: 12.5px; color: #6c3bf4; text-decoration: none; border: 1px solid #6c3bf4; border-radius: 8px; padding: 4px 10px; font-weight: 500; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-  .pic img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; display: block; background: #e8eaed; }
-  .vid { display: block; padding: 14px 10px; background: #fff; border: 1px solid #e4e6ea; border-radius: 8px; font-size: 12.5px; color: #1c1e21; text-decoration: none; word-break: break-all; }
+  :root { color-scheme: light dark; --accent: #6c3bf4; --bg: #f5f6f8; --card: #fff; --line: #e4e6ea; --muted: #667085; --text: #1c1e21; --soft: #f0ecff; --softText: #5b3ac4; }
   @media (prefers-color-scheme: dark) {
-    body { background: #17191d; color: #e7eaee; }
-    header { background: #1e2126; border-color: #343840; }
-    .hint { background: #322a56; color: #c9b8ff; }
-    .vid { background: #23262c; border-color: #343840; color: #e7eaee; }
+    :root { --bg: #17191d; --card: #1e2126; --line: #343840; --muted: #9aa3ae; --text: #e7eaee; --soft: #322a56; --softText: #c9b8ff; --accent: #8b6bff; }
   }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
+  header { position: sticky; top: 0; z-index: 10; background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header .count { color: var(--muted); font-size: 13px; font-weight: 400; margin-left: 4px; }
+  .btn { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; padding: 9px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  details.hint { margin: 12px 16px 0; padding: 10px 12px; background: var(--soft); color: var(--softText); border-radius: 12px; font-size: 13px; line-height: 1.7; }
+  details.hint summary { font-weight: 600; cursor: pointer; }
+  details.hint ol { margin: 6px 0 0; padding-left: 20px; }
+  section { margin: 20px 16px 0; }
+  section h2 { font-size: 15px; margin: 0 0 10px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  section h2 span { color: var(--muted); font-size: 12px; font-weight: 400; }
+  section h2 .zip { margin-left: auto; font-size: 12.5px; color: var(--accent); text-decoration: none; border: 1px solid var(--accent); border-radius: 8px; padding: 4px 10px; font-weight: 500; white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .pic img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; display: block; background: var(--line); }
+  .vid { display: flex; align-items: center; gap: 6px; aspect-ratio: 16/9; padding: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; font-size: 11px; color: var(--muted); text-decoration: none; word-break: break-all; overflow: hidden; }
+  .vid b { color: var(--accent); font-size: 18px; }
+  .empty { margin: 40px 24px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.7; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Switch 相册 <span class="count">共 __TOTAL__ 个文件</span></h1>
+  <h1>Switch 相册<span class="count">共 __TOTAL__ 个</span></h1>
   <a class="btn" href="/zip?game=__all__&t=__TOKEN__">下载全部 ZIP</a>
 </header>
-<p class="hint">长按照片可单张「存储到照片」。批量：点「下载 ZIP」→ 打开「文件」App 解压 → 全选 → 共享 → 存储图像。</p>
+<details class="hint" open>
+  <summary>怎么存进「照片」？</summary>
+  <ol>
+    <li>单张：点开照片 → 长按 →「存储到照片」；视频点开后点分享 →「存储视频」</li>
+    <li>批量：点「下载 ZIP」→ 打开「文件」App → 点 ZIP 解压 → 进文件夹点「选择」全选 → 分享 →「存储 N 张图像」</li>
+  </ol>
+</details>
 __SECTIONS__
 </body>
 </html>

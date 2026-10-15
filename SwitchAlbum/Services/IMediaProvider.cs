@@ -36,6 +36,21 @@ public interface IMediaProvider
 
     /// <summary>设备插拔通知（可能来自任意线程）。</summary>
     event EventHandler<DeviceChangedEventArgs>? DeviceChanged;
+
+    /// <summary>
+    /// 传输期间暂停后台设备轮询（避免轮询的枚举/连接与正在进行的 MTP 传输抢占 WPD）。
+    /// 返回值 Dispose 后恢复。默认实现不做任何事。
+    /// </summary>
+    IDisposable SuspendPolling() => NoopDisposable.Instance;
+}
+
+internal sealed class NoopDisposable : IDisposable
+{
+    public static readonly NoopDisposable Instance = new();
+
+    public void Dispose()
+    {
+    }
 }
 
 /// <summary>与单个设备的会话。路径分隔符统一为 '\'，根目录为 "\"。</summary>

@@ -23,12 +23,15 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly SettingsService _settings;
     private readonly ThemeService _theme;
     private readonly IMediaProvider _provider;
+    private readonly DuplicateTracker? _tracker;
 
-    public SettingsViewModel(SettingsService settings, ThemeService theme, IMediaProvider provider)
+    public SettingsViewModel(SettingsService settings, ThemeService theme, IMediaProvider provider, DuplicateTracker? tracker = null)
     {
         _settings = settings;
         _theme = theme;
         _provider = provider;
+        _tracker = tracker;
+        _savedCountText = tracker != null ? string.Format(Strings.Settings_SavedCount, tracker.Count) : "";
         _savePath = settings.Current.SavePath;
         _autoRename = settings.Current.AutoRename;
         _themeOption = MapToOption(theme.Theme);
@@ -42,6 +45,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private PhoneOption? _selectedPhone;
     [ObservableProperty] private string _cacheStatus = "";
     [ObservableProperty] private string _cacheSizeText = "";
+    [ObservableProperty] private string _savedCountText;
 
     public ObservableCollection<PhoneOption> Phones { get; } = new();
 
@@ -122,6 +126,32 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             // 打开失败忽略
         }
+    }
+
+    /// <summary>
+    /// 清除「已保存」记录：所有照片恢复为未保存，下次保存不会被跳过。
+    /// 不删除任何照片文件。用于记录与实际不符时的补救（例如换了电脑、手机恢复出厂）。
+    /// </summary>
+    [RelayCommand]
+    private void ClearSavedRecords()
+    {
+        if (_tracker == null)
+        {
+            return;
+        }
+
+        var answer = System.Windows.MessageBox.Show(
+            Strings.Settings_ClearSavedConfirm, Strings.Btn_ClearSaved,
+            System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Question);
+        if (answer != System.Windows.MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        var count = _tracker.Count;
+        _tracker.ClearAll();
+        Log.Info($"用户清除了 {count} 条已保存记录");
+        SavedCountText = string.Format(Strings.Settings_ClearSavedDone, count);
     }
 
     [RelayCommand]

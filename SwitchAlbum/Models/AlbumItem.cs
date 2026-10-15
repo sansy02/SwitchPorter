@@ -21,6 +21,9 @@ public sealed class AlbumItem
 
     public SavedState Saved { get; set; }
 
-    /// <summary>重复检测标识。</summary>
-    public string DedupId => GameTitle + "|" + FileName;
+    /// <summary>
+    /// 去重记录键的覆盖值：本地相册页的文件已被重命名，这里指回它对应的 Switch 原图记录，
+    /// 这样「电脑 → 手机」与「Switch 直传手机」共用同一条记录，不会产生两份副本。
+    /// </summary>
+    public string? TrackingKey { get; set; }
 }

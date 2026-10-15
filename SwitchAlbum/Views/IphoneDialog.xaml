@@ -3,43 +3,62 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:res="clr-namespace:SwitchAlbum.Resources"
         Title="{x:Static res:Strings.Iphone_Dialog_Title}"
-        Width="440" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        Width="460" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBackgroundBrush}"
         FontFamily="Microsoft YaHei UI, Segoe UI"
         TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
-    <StackPanel Margin="26,22,26,20">
-        <TextBlock Text="{x:Static res:Strings.Iphone_UrlLabel}" FontSize="12.5"
+    <StackPanel Margin="26,20,26,20">
+        <TextBlock x:Name="SummaryText" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <TextBlock Text="{x:Static res:Strings.Iphone_Step1}" Margin="0,6,0,0" FontSize="12.5" TextWrapping="Wrap"
                    Foreground="{DynamicResource TextSecondaryBrush}"/>
 
         <!-- 二维码 -->
-        <Image x:Name="QrImage" Width="200" Height="200" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+        <Border Background="White" CornerRadius="12" Padding="10" HorizontalAlignment="Center" Margin="0,14,0,0">
+            <Image x:Name="QrImage" Width="196" Height="196" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+        </Border>
 
-        <!-- 地址 + 复制 -->
-        <Grid Margin="0,12,0,0">
+        <!-- 地址：多网卡时可切换 -->
+        <Grid Margin="0,14,0,0">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="8" Padding="10,7" VerticalAlignment="Center">
-                <TextBlock x:Name="UrlText" TextTrimming="CharacterEllipsis" FontSize="12.5" ToolTip="{Binding Text, ElementName=UrlText}"/>
-            </Border>
-            <Button Grid.Column="1" Content="{x:Static res:Strings.Iphone_CopyUrl}" Click="Copy_Click"
+            <TextBlock Text="{x:Static res:Strings.Iphone_AddressLabel}" VerticalAlignment="Center" FontSize="12.5"
+                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,10,0"/>
+            <ComboBox x:Name="AddressBox" Grid.Column="1" SelectionChanged="AddressBox_SelectionChanged"
+                      ToolTip="{x:Static res:Strings.Iphone_AddressTip}"/>
+            <Button Grid.Column="2" x:Name="CopyButton" Content="{x:Static res:Strings.Iphone_CopyUrl}" Click="Copy_Click"
                     Style="{StaticResource SubtleButtonStyle}" Margin="10,0,0,0" Padding="12,6" FontSize="12"/>
         </Grid>
 
         <!-- 步骤 -->
-        <StackPanel Margin="0,18,0,0">
-            <TextBlock Text="{x:Static res:Strings.Iphone_Step1}" Margin="0,0,0,6" TextWrapping="Wrap" FontSize="13"/>
+        <StackPanel Margin="0,16,0,0">
             <TextBlock Text="{x:Static res:Strings.Iphone_Step2}" Margin="0,0,0,6" TextWrapping="Wrap" FontSize="13"/>
             <TextBlock Text="{x:Static res:Strings.Iphone_Step3}" Margin="0,0,0,6" TextWrapping="Wrap" FontSize="13"/>
             <TextBlock Text="{x:Static res:Strings.Iphone_Step4}" Margin="0,0,0,6" TextWrapping="Wrap" FontSize="13"/>
-            <TextBlock Text="{x:Static res:Strings.Iphone_Note}" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="11.5"
-                       Foreground="{DynamicResource TextSecondaryBrush}" LineHeight="18"/>
         </StackPanel>
 
+        <!-- 打不开时的排查 -->
+        <Expander Header="{x:Static res:Strings.Iphone_TroubleTitle}" Margin="0,8,0,0" FontSize="13">
+            <StackPanel Margin="4,8,0,0">
+                <TextBlock Text="{x:Static res:Strings.Iphone_Trouble1}" TextWrapping="Wrap" FontSize="12.5" Margin="0,0,0,6"/>
+                <TextBlock Text="{x:Static res:Strings.Iphone_Trouble2}" TextWrapping="Wrap" FontSize="12.5" Margin="0,0,0,6"/>
+                <TextBlock Text="{x:Static res:Strings.Iphone_Trouble3}" TextWrapping="Wrap" FontSize="12.5" Margin="0,0,0,6"/>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button Content="{x:Static res:Strings.Iphone_AllowFirewall}" Click="Firewall_Click"
+                            Style="{StaticResource SubtleButtonStyle}" Padding="12,6" FontSize="12"/>
+                    <TextBlock x:Name="FirewallStatus" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+            </StackPanel>
+        </Expander>
+
+        <TextBlock Text="{x:Static res:Strings.Iphone_Note}" Margin="0,12,0,0" TextWrapping="Wrap" FontSize="11.5"
+                   Foreground="{DynamicResource TextSecondaryBrush}" LineHeight="18"/>
+
         <Button Content="{x:Static res:Strings.Settings_Close}" Click="Close_Click"
-                Style="{StaticResource PrimaryButtonStyle}" MinWidth="96" HorizontalAlignment="Right" Margin="0,18,0,0"/>
+                Style="{StaticResource PrimaryButtonStyle}" MinWidth="96" HorizontalAlignment="Right" Margin="0,16,0,0"/>
     </StackPanel>
 </Window>

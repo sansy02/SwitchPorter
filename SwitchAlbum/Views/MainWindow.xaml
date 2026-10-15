@@ -15,32 +15,38 @@
         Loaded="Window_Loaded" Closing="Window_Closing" PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
+        <conv:InverseBooleanConverter x:Key="InvertBool"/>
         <DataTemplate DataType="{x:Type vm:GameWallViewModel}">
             <views:GameWallView/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:GameGridViewModel}">
             <views:GameGridView/>
         </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:LocalGameGridViewModel}">
-            <views:LocalGameGridView/>
-        </DataTemplate>
     </Window.Resources>
 
+    <!--
+        布局：顶栏选「从哪里看」（来源），底部操作栏选「送到哪里」（去处）。
+        ┌ 标题 · 设备状态 ─── [Switch 相册][电脑里的照片] ─── 刷新 · 设置 ┐
+        │ 游戏墙 / 照片网格                                              │
+        ├ 已选 N 项 · 保存位置      [存到电脑][存到安卓手机][发送到 iPhone] ┤
+        └ 轻提示                         进度 · 速度 · 剩余时间 · 取消     ┘
+    -->
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- ============ 顶栏 ============ -->
-        <Border Grid.Row="0" Background="{DynamicResource TopBarBackgroundBrush}" Padding="18,11"
+        <!-- ============ 顶栏：来源 ============ -->
+        <Border Grid.Row="0" Background="{DynamicResource TopBarBackgroundBrush}" Padding="18,10"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -62,151 +68,35 @@
                                     </Style>
                                 </Ellipse.Style>
                             </Ellipse>
-                            <TextBlock Margin="7,0,0,0" Text="{Binding DeviceStatusText}" FontSize="12.5"
+                            <TextBlock Margin="7,0,0,0" Text="{Binding DeviceStatusText}" FontSize="12.5" MaxWidth="200"
+                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding DeviceStatusText}"
                                        VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Switch 页按钮组 -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding PageMode}" Value="Switch">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-                        <TextBlock Text="{x:Static res:Strings.Lbl_SavePath}" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding SavePathText}" VerticalAlignment="Center" MaxWidth="130"
-                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding SavePathText}"/>
-                        <Button Content="{x:Static res:Strings.Btn_ChangePath}" Command="{Binding ChangeSavePathCommand}"
-                                Style="{StaticResource SubtleButtonStyle}" Margin="8,0,0,0" Padding="10,5" FontSize="12"/>
+                <!-- 来源分段标签：紫色胶囊在两个标签之间滑动 -->
+                <Border Grid.Column="1" Background="{DynamicResource ChipBackgroundBrush}" CornerRadius="11" Padding="3"
+                        VerticalAlignment="Center" IsEnabled="{Binding IsTransferring, Converter={StaticResource InvertBool}}">
+                    <Grid>
+                        <Border x:Name="TabIndicator" Background="{DynamicResource PurpleBrush}" CornerRadius="9"
+                                HorizontalAlignment="Left" Width="0">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="TabIndicatorShift"/>
+                            </Border.RenderTransform>
+                        </Border>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="SwitchTab" Content="{x:Static res:Strings.Tab_SwitchAlbum}" Command="{Binding ShowSwitchSourceCommand}"
+                                    Tag="{Binding IsSwitchSource}" Style="{StaticResource SegmentTabStyle}"/>
+                            <Button x:Name="LibraryTab" Content="{x:Static res:Strings.Tab_Library}" Command="{Binding ShowLibrarySourceCommand}"
+                                    Tag="{Binding IsLibrarySource}" Style="{StaticResource SegmentTabStyle}" Margin="3,0,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
 
-                        <Rectangle Width="1" Height="22" Fill="{DynamicResource BorderBrush}" Margin="16,0"/>
-
-                        <Button Content="{x:Static res:Strings.Btn_Rescan}" Command="{Binding RescanCommand}"
-                                Style="{StaticResource SubtleButtonStyle}"/>
-                    </StackPanel>
-
-                    <!-- 安卓页按钮组 -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding PageMode}" Value="LocalAndroid">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-                        <Button Content="{x:Static res:Strings.Btn_SaveAllToPhone}" Command="{Binding LocalSaveAllToPhoneCommand}"
-                                Style="{StaticResource PrimaryButtonStyle}"/>
-                    </StackPanel>
-
-                    <!-- 苹果页按钮组 -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding PageMode}" Value="LocalIphone">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-                        <Button Content="{x:Static res:Strings.Btn_IphoneEntry}" Command="{Binding OpenIphoneEntryCommand}"
-                                Style="{StaticResource PrimaryButtonStyle}"/>
-                        <TextBlock Text="{x:Static res:Strings.Iphone_ServerRunning}" VerticalAlignment="Center"
-                                   Margin="10,0,0,0" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    </StackPanel>
-
-                    <!-- 页面切换标签：激活 = 紫底白字，非激活 = 白底紫字，三键逻辑一致 -->
-                    <Button Content="{x:Static res:Strings.Btn_SaveToPc}" Command="{Binding SaveToPcCommand}"
-                            Margin="10,0,0,0" Padding="18,7">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource PageTabActiveButtonStyle}">
-                                <Style.Triggers>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsSwitchPage}" Value="False"/>
-                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="False"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="Foreground" Value="{DynamicResource PurpleBrush}"/>
-                                        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
-                                    </MultiDataTrigger>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsSwitchPage}" Value="False"/>
-                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Background" Value="{DynamicResource PurpleSoftBrush}"/>
-                                        <Setter Property="Foreground" Value="{DynamicResource PurpleBrush}"/>
-                                        <Setter Property="BorderBrush" Value="{DynamicResource PurpleBrush}"/>
-                                    </MultiDataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                    <Button Content="{x:Static res:Strings.Btn_SaveToPhoneAndroid}" Command="{Binding OpenLocalAlbumCommand}"
-                            Margin="10,0,0,0" Padding="18,7">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource PageTabInactiveButtonStyle}">
-                                <Style.Triggers>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsAndroidPage}" Value="True"/>
-                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="False"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Background" Value="{DynamicResource PurpleBrush}"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                    </MultiDataTrigger>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsAndroidPage}" Value="True"/>
-                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Background" Value="{DynamicResource PurpleHoverBrush}"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                    </MultiDataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                    <Button Content="{x:Static res:Strings.Btn_SaveToPhoneIphone}" Command="{Binding OpenIphonePageCommand}"
-                            Margin="10,0,0,0" Padding="18,7">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource PageTabInactiveButtonStyle}">
-                                <Style.Triggers>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsIphonePage}" Value="True"/>
-                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="False"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Background" Value="{DynamicResource PurpleBrush}"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                    </MultiDataTrigger>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsIphonePage}" Value="True"/>
-                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Background" Value="{DynamicResource PurpleHoverBrush}"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                    </MultiDataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <Button Content="{x:Static res:Strings.Btn_Refresh}" Command="{Binding RefreshCommand}"
+                            Style="{StaticResource SubtleButtonStyle}"/>
                     <Button Content="{x:Static res:Strings.Btn_Settings}" Command="{Binding OpenSettingsCommand}"
                             Style="{StaticResource SubtleButtonStyle}" Margin="10,0,0,0"/>
                 </StackPanel>
@@ -217,11 +107,12 @@
         <Grid Grid.Row="1">
             <controls:TransitionHost x:Name="ContentHost" Content="{Binding CurrentContent}"/>
 
-            <!-- 空状态提示 -->
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="640"
+            <!-- 空状态：安静的月夜远山 + 提示文字（标题随状态变化：未连接 / 相册为空 / 电脑里没有照片 / 正在扫描） -->
+            <controls:EmptyScene Visibility="{Binding HintVisible, Converter={StaticResource BoolToVis}}"/>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="640" Margin="0,0,0,120"
                         Visibility="{Binding HintVisible, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="{x:Static res:Strings.Status_NotConnected}" TextWrapping="Wrap" TextAlignment="Center"
-                           FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                <TextBlock Text="{Binding HintTitle}" TextWrapping="Wrap" TextAlignment="Center"
+                           FontSize="24" FontWeight="Light" Foreground="{DynamicResource TextPrimaryBrush}"/>
                 <TextBlock Text="{Binding HintText}" TextWrapping="Wrap" TextAlignment="Center" FontSize="13"
                            Foreground="{DynamicResource TextSecondaryBrush}" LineHeight="22" Margin="0,14,0,0"
                            MaxWidth="560"/>
@@ -260,7 +151,11 @@
                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0"/>
 
                 <Grid Margin="96,40,96,88">
-                    <Image x:Name="LightboxImage" Source="{Binding Lightbox.FullPath}" Stretch="Uniform"/>
+                    <Image x:Name="LightboxImage" Source="{Binding Lightbox.FullPath}" Stretch="Uniform" RenderTransformOrigin="0.5,0.5">
+                        <Image.RenderTransform>
+                            <ScaleTransform x:Name="LightboxScale"/>
+                        </Image.RenderTransform>
+                    </Image>
 
                     <!-- 视频占位 -->
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -284,33 +179,123 @@
             </Grid>
         </Grid>
 
-        <!-- ============ 状态栏 ============ -->
+        <!-- ============ 操作栏：去处 ============ -->
         <Border Grid.Row="2" Background="{DynamicResource TopBarBackgroundBrush}"
-                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="18,9">
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="18,10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ActionSummary}" VerticalAlignment="Center" FontSize="13">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CanAct}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <!-- 保存位置（Switch 来源时显示，「存到电脑」的目的地） -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0"
+                                Visibility="{Binding IsSwitchSource, Converter={StaticResource BoolToVis}}">
+                        <Rectangle Width="1" Height="18" Fill="{DynamicResource BorderBrush}" Margin="0,0,16,0"/>
+                        <TextBlock Text="{x:Static res:Strings.Lbl_SaveTo}" VerticalAlignment="Center" FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding SavePathText}" VerticalAlignment="Center" MaxWidth="220" FontSize="12"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding SavePathText}"/>
+                        <Button Content="{x:Static res:Strings.Btn_ChangePath}" Command="{Binding ChangeSavePathCommand}"
+                                Style="{StaticResource SubtleButtonStyle}" Margin="8,0,0,0" Padding="10,4" FontSize="12"/>
+                    </StackPanel>
+
+                    <!-- 电脑来源：打开保存文件夹 -->
+                    <Button Content="{x:Static res:Strings.Btn_OpenSaveFolder}" Command="{Binding OpenSaveFolderCommand}"
+                            Style="{StaticResource SubtleButtonStyle}" Margin="20,0,0,0" Padding="10,4" FontSize="12"
+                            Visibility="{Binding IsLibrarySource, Converter={StaticResource BoolToVis}}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="{x:Static res:Strings.Action_SaveToPc}" Command="{Binding SaveToPcCommand}"
+                            IsEnabled="{Binding CanSaveToPc}" ToolTip="{Binding SaveToPcTooltip}"
+                            ToolTipService.ShowOnDisabled="True"
+                            Style="{StaticResource PrimaryButtonStyle}" Padding="18,8"
+                            Visibility="{Binding IsSwitchSource, Converter={StaticResource BoolToVis}}"/>
+                    <Button Content="{x:Static res:Strings.Action_SaveToAndroid}" Command="{Binding SaveToAndroidCommand}"
+                            IsEnabled="{Binding CanSendToPhone}" ToolTip="{x:Static res:Strings.Action_AndroidTip}"
+                            ToolTipService.ShowOnDisabled="True"
+                            Style="{StaticResource DestinationButtonStyle}" Margin="10,0,0,0"/>
+                    <Button Content="{x:Static res:Strings.Action_SendToIphone}" Command="{Binding SendToIphoneCommand}"
+                            IsEnabled="{Binding CanSendToPhone}" ToolTip="{x:Static res:Strings.Action_IphoneTip}"
+                            ToolTipService.ShowOnDisabled="True"
+                            Style="{StaticResource DestinationButtonStyle}" Margin="10,0,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ 状态栏 ============ -->
+        <Border Grid.Row="3" Background="{DynamicResource WindowBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="18,7">
+            <Grid MinHeight="26">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
                 <!-- 轻提示 -->
-                <Border CornerRadius="10" Background="{DynamicResource ToastBackgroundBrush}" Padding="14,7"
-                        VerticalAlignment="Center" HorizontalAlignment="Left"
+                <Border CornerRadius="10" Background="{DynamicResource ToastBackgroundBrush}" Padding="14,5"
+                        VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,16,0"
+                        BorderBrush="{DynamicResource AccentSoftBrush}" BorderThickness="1"
                         Visibility="{Binding ToastVisible, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="{Binding ToastText}" Foreground="White" FontSize="12.5"/>
+                    <Border.RenderTransform>
+                        <TranslateTransform/>
+                    </Border.RenderTransform>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <!-- 轻提示从下方浮上来 -->
+                                <Trigger Property="IsVisible" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.3"/>
+                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                                 From="10" To="0" Duration="0:0:0.42">
+                                                    <DoubleAnimation.EasingFunction>
+                                                        <ExponentialEase EasingMode="EaseOut" Exponent="5"/>
+                                                    </DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding ToastText}" Foreground="White" FontSize="12.5" TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding ToastText}"/>
                 </Border>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource TextSecondaryBrush}"
-                               FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <ProgressBar Width="220" Style="{StaticResource ThinProgressBarStyle}"
-                                 Value="{Binding ProgressValue}" IsIndeterminate="{Binding ProgressIndeterminate}"
+                               FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="560"
+                               TextTrimming="CharacterEllipsis" ToolTip="{Binding ProgressText}"/>
+                    <ProgressBar Width="200" Style="{StaticResource ThinProgressBarStyle}" Value="{Binding ProgressValue}"
                                  Visibility="{Binding IsTransferring, Converter={StaticResource BoolToVis}}"/>
-                    <ProgressBar Width="220" Style="{StaticResource ThinProgressBarStyle}" IsIndeterminate="True"
+                    <ProgressBar Width="200" Style="{StaticResource ThinProgressBarStyle}" IsIndeterminate="True"
                                  Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}"/>
                     <Button Content="{x:Static res:Strings.Btn_Cancel}" Command="{Binding CancelTransferCommand}"
-                            Style="{StaticResource SubtleButtonStyle}" Margin="12,0,0,0" Padding="10,5" FontSize="12"
+                            Style="{StaticResource SubtleButtonStyle}" Margin="12,0,0,0" Padding="10,4" FontSize="12"
                             Visibility="{Binding IsTransferring, Converter={StaticResource BoolToVis}}"/>
+                    <Button Content="{x:Static res:Strings.Btn_OpenFolder}" Command="{Binding OpenLastOutputCommand}"
+                            Style="{StaticResource SubtleButtonStyle}" Margin="12,0,0,0" Padding="10,4" FontSize="12"
+                            Visibility="{Binding HasLastOutput, Converter={StaticResource BoolToVis}}"/>
                 </StackPanel>
             </Grid>
         </Border>

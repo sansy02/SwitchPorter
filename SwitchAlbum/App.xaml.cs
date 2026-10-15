@@ -15,9 +15,15 @@ public partial class App : Application
         base.OnStartup(e);
         DispatcherUnhandledException += (_, args) =>
         {
-            // 未处理异常不崩溃：状态栏提示由各命令自行处理，这里兜底记录
+            // 未处理异常不崩溃：记录日志并给出可见提示（之前只写日志，用户不知道发生了什么）
             Log.Error("未处理异常: " + args.Exception.Message, args.Exception);
             args.Handled = true;
+            (MainWindow?.DataContext as MainViewModel)?.ShowToast("出错了：" + args.Exception.Message + "（详情见设置 → 打开日志文件夹）");
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            Log.Error("后台任务异常", args.Exception);
+            args.SetObserved();
         };
 
         try
@@ -39,9 +45,12 @@ public partial class App : Application
             var thumbnailService = new ThumbnailService();
             var coverService = new CoverService();
 
+            // 游戏库（约 10MB JSON）放到后台解析：先把窗口显示出来，不再启动白屏
+            var titleDbTask = Task.Run<ITitleDb?>(() => TitleDbService.LoadEmbedded());
+
             var mainViewModel = new MainViewModel(
                 _settings, _theme, tracker, saveService, phoneSaveService,
-                thumbnailService, coverService, new ScanCacheService(), TitleDbService.LoadEmbedded());
+                thumbnailService, coverService, new ScanCacheService(), titleDbTask);
 
             var window = new MainWindow { DataContext = mainViewModel };
             mainViewModel.AttachWindow(window);

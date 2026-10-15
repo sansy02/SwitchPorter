@@ -29,7 +29,7 @@ public sealed partial class GameCardViewModel : ObservableObject
     [ObservableProperty] private string _subtitle;
     [ObservableProperty] private string? _coverPath;
 
-    public string? TitleId { get; }
+    public string? TitleId { get; private set; }
     public string? DevicePath { get; }
     public int PhotoCount => _items.Count(i => !i.IsVideo);
     public int VideoCount => _items.Count(i => i.IsVideo);
@@ -56,6 +56,19 @@ public sealed partial class GameCardViewModel : ObservableObject
         {
             CoverPath = path;
         }
+    }
+
+    /// <summary>游戏库在线更新后（如补齐了 Switch 2 游戏），用新的 TitleId 重新取封面。</summary>
+    public void RetryCover(string titleId)
+    {
+        if (CoverPath != null || titleId == TitleId)
+        {
+            return;
+        }
+
+        TitleId = titleId;
+        Interlocked.Exchange(ref _coverLoadStarted, 0);
+        _ = EnsureCoverAsync();
     }
 
     private string ComputeSubtitle()

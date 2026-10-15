@@ -8,9 +8,12 @@ namespace SwitchAlbum.Controls;
 
 public partial class GameCard : UserControl
 {
+    private readonly CardMotion _motion;
+
     public GameCard()
     {
         InitializeComponent();
+        _motion = new CardMotion(Root, RootScale, hoverScale: 1.035, liftBy: 5);
         DataContextChanged += (_, _) =>
         {
             if (DataContext is GameCardViewModel viewModel)
@@ -27,9 +30,9 @@ public partial class GameCard : UserControl
         };
     }
 
-    private void Root_MouseEnter(object sender, MouseEventArgs e) => AnimateScale(1.04);
+    private void Root_MouseEnter(object sender, MouseEventArgs e) => _motion.Enter();
 
-    private void Root_MouseLeave(object sender, MouseEventArgs e) => AnimateScale(1.0);
+    private void Root_MouseLeave(object sender, MouseEventArgs e) => _motion.Leave();
 
     private void Root_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -37,15 +40,5 @@ public partial class GameCard : UserControl
         {
             viewModel.OpenCommand.Execute(null);
         }
-    }
-
-    private void AnimateScale(double target)
-    {
-        var duration = TimeSpan.FromMilliseconds(160);
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        RootScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
-            new DoubleAnimation(target, duration) { EasingFunction = ease });
-        RootScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
-            new DoubleAnimation(target, duration) { EasingFunction = ease });
     }
 }

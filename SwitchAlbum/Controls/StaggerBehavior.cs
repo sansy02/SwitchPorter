@@ -7,7 +7,7 @@ using System.Windows.Media.Animation;
 namespace SwitchAlbum.Controls;
 
 /// <summary>
-/// ItemsControl 容器入场错峰动画：逐项延迟 30ms 淡入 + 上移（用于游戏卡片墙）。
+/// ItemsControl 容器入场错峰动画：逐项延迟 32ms 淡入 + 上浮 + 微缩放（用于游戏卡片墙）。
 /// </summary>
 public static class StaggerBehavior
 {
@@ -58,17 +58,27 @@ public static class StaggerBehavior
 
     private static void AnimateIn(FrameworkElement element, int index)
     {
+        // 卡片从下方轻轻浮起、由小到正常——像从雾里浮现，而不是弹出来
         element.Opacity = 0;
-        var transform = new TranslateTransform { Y = 16 };
-        element.RenderTransform = transform;
+        element.RenderTransformOrigin = new Point(0.5, 0.5);
+        var translate = new TranslateTransform { Y = 22 };
+        var scale = new ScaleTransform(0.96, 0.96);
+        var group = new TransformGroup();
+        group.Children.Add(scale);
+        group.Children.Add(translate);
+        element.RenderTransform = group;
 
-        var delay = TimeSpan.FromMilliseconds(Math.Min(index, 16) * 30);
-        var duration = TimeSpan.FromMilliseconds(280);
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var delay = TimeSpan.FromMilliseconds(Math.Min(index, 18) * 32);
+        var duration = TimeSpan.FromMilliseconds(520);
+        var ease = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 };
 
         element.BeginAnimation(UIElement.OpacityProperty,
-            new DoubleAnimation(1, duration) { BeginTime = delay, EasingFunction = ease });
-        transform.BeginAnimation(TranslateTransform.YProperty,
+            new DoubleAnimation(1, TimeSpan.FromMilliseconds(380)) { BeginTime = delay, EasingFunction = ease });
+        translate.BeginAnimation(TranslateTransform.YProperty,
             new DoubleAnimation(0, duration) { BeginTime = delay, EasingFunction = ease });
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(1, duration) { BeginTime = delay, EasingFunction = ease });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(1, duration) { BeginTime = delay, EasingFunction = ease });
     }
 }

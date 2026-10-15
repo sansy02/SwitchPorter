@@ -28,14 +28,7 @@
                     ClipToBounds="True"
                     Visibility="{Binding IsAllCard, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
                 <Grid>
-                    <Rectangle>
-                        <Rectangle.Fill>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Color="#E8EAED" Offset="0"/>
-                                <GradientStop Color="#CDD2D9" Offset="1"/>
-                            </LinearGradientBrush>
-                        </Rectangle.Fill>
-                    </Rectangle>
+                    <Rectangle Fill="{DynamicResource PlaceholderBrush}"/>
                     <Image Source="{Binding CoverPath}" Stretch="UniformToFill"/>
                     <TextBlock Text="{x:Static res:Strings.Cover_Unknown}" HorizontalAlignment="Center" VerticalAlignment="Center"
                                FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
@@ -46,7 +39,7 @@
             <!-- 「全部」卡片的图标：叠影圆角方块 -->
             <Grid Width="92" Height="92" HorizontalAlignment="Center" VerticalAlignment="Center"
                   Visibility="{Binding IsAllCard, Converter={StaticResource BoolToVis}}">
-                <Border Width="72" Height="72" CornerRadius="14" Background="#D8DCE2" RenderTransformOrigin="0.5,0.5"
+                <Border Width="72" Height="72" CornerRadius="14" Background="{DynamicResource PurpleSoftBrush}" RenderTransformOrigin="0.5,0.5"
                         VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,10,12,0">
                     <Border.RenderTransform>
                         <RotateTransform Angle="-8"/>

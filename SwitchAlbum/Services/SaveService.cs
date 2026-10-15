@@ -11,9 +11,15 @@ public sealed class SaveResult
     public int SkippedCount { get; init; }
     public bool Cancelled { get; init; }
     public IReadOnlyList<(AlbumItem Item, string Error)> Failed { get; init; } = Array.Empty<(AlbumItem, string)>();
+
+    /// <summary>本次实际写入的文件所在目录（保存到电脑时用于「打开文件夹」）。</summary>
+    public string? OutputFolder { get; init; }
+
+    public static SaveResult AllFailed(IReadOnlyList<AlbumItem> items, string error)
+        => new() { Failed = items.Select(i => (i, error)).ToList() };
 }
 
-/// <summary>保存到电脑：去重 → 重命名规划 → 限流下载（.part 临时名）→ 校验 → 标记已保存。</summary>
+/// <summary>保存到电脑：去重（校验文件仍存在）→ 重命名规划 → 限流下载（.part 临时名）→ 完整性校验 → 标记已保存。</summary>
 public sealed class SaveService
 {
     private readonly DuplicateTracker _tracker;
@@ -38,50 +44,42 @@ public sealed class SaveService
         {
             Directory.CreateDirectory(targetDir);
         }
-        catch
+        catch (Exception ex)
         {
-            return new SaveResult
-            {
-                Failed = items.Select(i => (i, "目录不可用")).ToList(),
-            };
+            Log.Error("保存目录不可用: " + targetDir, ex);
+            return SaveResult.AllFailed(items, "保存目录不可用");
         }
 
-        var pending = items.Where(i => !HasSavedToPc(i)).ToList();
+        // 只跳过「电脑上确实还有」的文件；用户删掉或换了保存位置后可重新保存
+        var pending = items.Where(i => !_tracker.IsOnPc(i)).ToList();
         var skipped = items.Count - pending.Count;
 
         // 按游戏分文件夹：保存位置\游戏名\文件，目录名经清理
         var dirOf = new Dictionary<AlbumItem, string>();
         var existingNamesByDir = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var failures = new List<(AlbumItem Item, string Error)>();
         foreach (var group in pending.GroupBy(i => i.GameTitle))
         {
             var dir = Path.Combine(targetDir, FileNameSanitizer.Sanitize(group.Key));
-            foreach (var item in group)
-            {
-                dirOf[item] = dir;
-            }
-
             try
             {
                 Directory.CreateDirectory(dir);
                 existingNamesByDir[dir] = SafeEnumerateFileNames(dir);
-            }
-            catch
-            {
                 foreach (var item in group)
                 {
-                    dirOf.Remove(item);
+                    dirOf[item] = dir;
                 }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("无法创建游戏文件夹: " + dir, ex);
+                failures.AddRange(group.Select(i => (i, "无法创建文件夹")));
             }
         }
 
         var plan = new Dictionary<AlbumItem, string>();
-        foreach (var group in pending.GroupBy(i => dirOf.TryGetValue(i, out var dir) ? dir : null))
+        foreach (var group in pending.Where(dirOf.ContainsKey).GroupBy(i => dirOf[i]))
         {
-            if (group.Key == null)
-            {
-                continue;
-            }
-
             existingNamesByDir.TryGetValue(group.Key, out var existing);
             foreach (var (item, name) in RenamePlanner.Plan(group.ToList(), existing, autoRename))
             {
@@ -89,47 +87,44 @@ public sealed class SaveService
             }
         }
 
-        var failures = new List<(AlbumItem Item, string Error)>();
-        var done = 0;
+        var done = failures.Count;
         var saved = 0;
         long bytesDone = 0;
+        string? lastDir = null;
 
-        progress?.Report(new SaveProgress(items.Count, done, skipped, null, 0));
+        progress?.Report(new SaveProgress(items.Count, done + skipped, skipped, null, 0));
 
-        var tasks = pending.Select(item => _queue.EnqueueAsync(async _ =>
+        var tasks = pending.Where(plan.ContainsKey).Select(item => _queue.EnqueueAsync(async _ =>
         {
             ct.ThrowIfCancellationRequested();
 
-            if (!dirOf.TryGetValue(item, out var dir) || !plan.TryGetValue(item, out var name))
-            {
-                lock (_gate)
-                {
-                    failures.Add((item, "目录不可用"));
-                    done++;
-                }
-
-                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName, bytesDone));
-                return;
-            }
-
-            var finalPath = Path.Combine(dir, name);
+            var dir = dirOf[item];
+            var finalPath = Path.Combine(dir, plan[item]);
             var tmpPath = finalPath + ".part";
             try
             {
                 await session.DownloadFileAsync(item.DevicePath, tmpPath, ct).ConfigureAwait(false);
                 ct.ThrowIfCancellationRequested();
+
+                var error = MediaVerifier.Verify(tmpPath, item.Size);
+                if (error != null)
+                {
+                    throw new IOException(error);
+                }
+
                 var bytes = new FileInfo(tmpPath).Length;
-                File.Move(tmpPath, finalPath, overwrite: true);
-                _tracker.MarkSaved(item.GameTitle, item.FileName, Path.GetFileName(finalPath), toPc: true, toPhone: false);
+                File.Move(tmpPath, finalPath, overwrite: false);
+                _tracker.MarkSavedToPc(item, finalPath);
 
                 lock (_gate)
                 {
                     done++;
                     saved++;
                     bytesDone += bytes;
+                    lastDir = dir;
                 }
 
-                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName, bytesDone));
+                progress?.Report(new SaveProgress(items.Count, done + skipped, skipped, item.FileName, bytesDone));
             }
             catch (OperationCanceledException)
             {
@@ -139,13 +134,14 @@ public sealed class SaveService
             catch (Exception e)
             {
                 TryDelete(tmpPath);
+                Log.Error($"保存失败: {item.DevicePath} → {finalPath}", e);
                 lock (_gate)
                 {
                     failures.Add((item, e.Message));
                     done++;
                 }
 
-                progress?.Report(new SaveProgress(items.Count, done, skipped, item.FileName, bytesDone));
+                progress?.Report(new SaveProgress(items.Count, done + skipped, skipped, item.FileName, bytesDone));
             }
         }, ct)).ToList();
 
@@ -160,19 +156,17 @@ public sealed class SaveService
         }
 
         _tracker.Flush();
+
+        // 只涉及一个游戏时打开该游戏文件夹，否则打开保存根目录
+        var outputFolder = dirOf.Values.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1 ? lastDir : targetDir;
         return new SaveResult
         {
             SavedCount = saved,
             SkippedCount = skipped,
             Cancelled = cancelled,
             Failed = failures,
+            OutputFolder = outputFolder,
         };
-    }
-
-    private bool HasSavedToPc(AlbumItem item)
-    {
-        var state = _tracker.GetState(item.GameTitle, item.FileName);
-        return state is SavedState.SavedToPc or SavedState.SavedBoth;
     }
 
     private static List<string> SafeEnumerateFileNames(string dir)

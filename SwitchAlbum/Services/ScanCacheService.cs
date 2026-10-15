@@ -10,7 +10,7 @@ namespace SwitchAlbum.Services;
 public sealed class ScanCacheService
 {
     /// <summary>缓存结构版本：解析逻辑变更（如模糊名称反查）后递增，旧缓存直接失效。</summary>
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
 
     private readonly string _dir;
 

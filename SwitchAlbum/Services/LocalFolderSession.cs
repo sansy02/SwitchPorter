@@ -52,8 +52,7 @@ public sealed class LocalFolderSession : IMediaDeviceSession
     {
         var local = Resolve(sourcePath);
         ct.ThrowIfCancellationRequested();
-        File.Copy(local, destFilePath, overwrite: true);
-        return Task.CompletedTask;
+        return Task.Run(() => File.Copy(local, destFilePath, overwrite: true), ct);
     }
 
     public Task UploadFileAsync(string sourceFilePath, string destPath, CancellationToken ct)
@@ -94,13 +93,20 @@ public sealed class LocalFolderSession : IMediaDeviceSession
             return Task.FromResult<Stream?>(null);
         }
 
-        using var image = System.Drawing.Image.FromFile(local);
-        using var thumb = ImageUtil.Downscale(image, 480);
-        var stream = new MemoryStream();
-        thumb.Save(stream, ImageFormat.Jpeg);
-        stream.Position = 0;
-        return Task.FromResult<Stream?>(stream);
+        // 解码/缩放放到后台线程：之前在 UI 线程同步执行，本地相册页滚动会卡顿
+        return Task.Run<Stream?>(() =>
+        {
+            using var image = System.Drawing.Image.FromFile(local);
+            using var thumb = ImageUtil.Downscale(image, 480);
+            var stream = new MemoryStream();
+            thumb.Save(stream, ImageFormat.Jpeg);
+            stream.Position = 0;
+            return stream;
+        }, ct);
     }
+
+    /// <summary>虚拟路径（"\游戏名\文件"）→ 电脑上的完整路径。</summary>
+    public string ToLocalPath(string virtualPath) => Resolve(virtualPath);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -109,7 +115,8 @@ public sealed class LocalFolderSession : IMediaDeviceSession
         var relative = virtualPath.TrimStart('\\').Replace('/', Path.DirectorySeparatorChar);
         var full = string.IsNullOrEmpty(relative) ? _root : Path.Combine(_root, relative);
         var normalized = Path.GetFullPath(full);
-        if (!normalized.StartsWith(_root, StringComparison.OrdinalIgnoreCase))
+        if (!normalized.Equals(_root, StringComparison.OrdinalIgnoreCase)
+            && !normalized.StartsWith(_root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
         {
             throw new UnauthorizedAccessException("路径越界");
         }
