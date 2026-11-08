@@ -13,6 +13,9 @@ public sealed class AppSettings
     /// <summary>保存时按 日期_游戏名_序号 重命名。</summary>
     public bool AutoRename { get; set; } = true;
 
+    /// <summary>照片网格的预览大小档位（0 最小，4 最大）。</summary>
+    public int PhotoZoomLevel { get; set; } = 1;
+
     /// <summary>System / Light / Dark。</summary>
     public string Theme { get; set; } = "System";
 

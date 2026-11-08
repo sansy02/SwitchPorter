@@ -7,23 +7,30 @@ namespace SwitchAlbum.Services;
 
 /// <summary>
 /// 游戏封面服务，候选链（每个源失败自动试下一个，单个源内部重试 1 次）：
-/// 内置离线封面包（covers.zip，约 3000 款热门游戏，相册出现该游戏才解压）→
+/// 用户自己换的封面 → 内置离线封面包（covers.zip，约 3000 款热门游戏，相册出现该游戏才解压）→
 /// 任天堂官方直链（图标/横幅/盒装，来自 titles.json）→ tinfoil.media（按 titleId）→
 /// 失败返回 null（UI 显示占位）。成功结果按 key（titleId 或名称哈希）缓存到本地。
+/// <para>
+/// 用户的封面放在单独的目录（不是缓存，「清除缓存」不会删），按规范化后的游戏名存放：
+/// 同一款游戏在 Switch 相册和「电脑里的照片」共用一张。
+/// </para>
 /// </summary>
 public sealed class CoverService
 {
     private const string TinfoilBase = "https://tinfoil.media/ti/{0}/512/512";
+    private const int OverrideMaxSide = 512;
 
     private readonly string _cacheDir;
+    private readonly string _overrideDir;
     private readonly HttpClient _http;
     private readonly SemaphoreSlim _semaphore = new(4);
 
-    public CoverService(string? cacheDir = null)
+    public CoverService(string? cacheDir = null, string? overrideDir = null)
     {
-        _cacheDir = cacheDir ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SwitchAlbum", "covers");
+        var dataDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SwitchAlbum");
+        _cacheDir = cacheDir ?? Path.Combine(dataDir, "covers");
+        _overrideDir = overrideDir ?? (cacheDir != null ? cacheDir + "-overrides" : Path.Combine(dataDir, "cover-overrides"));
         Directory.CreateDirectory(_cacheDir);
 
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
@@ -36,9 +43,71 @@ public sealed class CoverService
         return File.Exists(path) ? path : null;
     }
 
+    /// <summary>用户给这款游戏换的封面；没换过返回 null。</summary>
+    public string? GetOverride(string title)
+    {
+        try
+        {
+            return Directory.Exists(_overrideDir)
+                ? Directory.EnumerateFiles(_overrideDir, NameKey(title) + "-*.png").MaxBy(Path.GetFileName, StringComparer.Ordinal)
+                : null;
+        }
+        catch (Exception ex)
+        {
+            Log.Info("读取自定义封面失败: " + ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 把一张图片设为这款游戏的封面（长边缩到 512，存成 PNG 保留透明）。
+    /// 每次换都用新文件名：界面按路径变化刷新，也不用担心旧文件还没释放。图片打不开时抛异常。
+    /// </summary>
+    public async Task<string> SetOverrideAsync(string title, string imagePath, CancellationToken ct = default)
+    {
+        var key = NameKey(title);
+        var dest = Path.Combine(_overrideDir, $"{key}-{DateTime.UtcNow.Ticks}.png");
+        await Task.Run(() =>
+        {
+            Directory.CreateDirectory(_overrideDir);
+            ImageUtil.SaveAsCover(imagePath, dest, OverrideMaxSide);
+        }, ct).ConfigureAwait(false);
+
+        foreach (var old in OverrideFiles(key).Where(f => !string.Equals(f, dest, StringComparison.OrdinalIgnoreCase)))
+        {
+            TryDelete(old);
+        }
+
+        return dest;
+    }
+
+    /// <summary>删除用户的封面，恢复默认。</summary>
+    /// <returns>确实删干净返回 true（没有自定义封面也算）。</returns>
+    public bool ClearOverride(string title)
+    {
+        var key = NameKey(title);
+        foreach (var file in OverrideFiles(key))
+        {
+            TryDelete(file);
+        }
+
+        return !OverrideFiles(key).Any();
+    }
+
+    private IEnumerable<string> OverrideFiles(string key)
+        => Directory.Exists(_overrideDir)
+            ? Directory.GetFiles(_overrideDir, key + "-*.png")
+            : Array.Empty<string>();
+
     public async Task<string?> ResolveAsync(
         string? titleId, string title, IReadOnlyList<string>? coverUrls, CancellationToken ct)
     {
+        var custom = GetOverride(title);
+        if (custom != null)
+        {
+            return custom;
+        }
+
         var key = !string.IsNullOrEmpty(titleId) ? titleId : NameKey(title);
         var cached = GetCachedPath(key);
         if (cached != null)
@@ -49,6 +118,7 @@ public sealed class CoverService
         await _semaphore.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            Directory.CreateDirectory(_cacheDir); // 「清除缓存」会把目录整个删掉
             var path = CachePathOf(key);
 
             // 优先内置离线封面包：无需网络，且只在相册里出现该游戏时才会走到这里

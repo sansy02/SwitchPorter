@@ -11,7 +11,7 @@ public interface ITitleDb
 
     /// <summary>
     /// 相册文件夹名 → TitleId。文件夹名是本地化游戏名（可能带后缀/括号/日文等变体），
-    /// 依次尝试：规范化精确匹配 → 繁转简 → 剥离后缀/括号 → 包含匹配。
+    /// 依次尝试：规范化精确匹配 → 繁转简 → 剥离后缀/括号 → 前缀匹配。
     /// </summary>
     string? GetTitleIdByFolderName(string folderName);
 

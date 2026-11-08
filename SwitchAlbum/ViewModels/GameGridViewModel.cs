@@ -12,16 +12,21 @@ public enum GridSortMode
     OldestFirst,
 }
 
-/// <summary>单个游戏（或全部）的照片网格。行分块 + ListBox 虚拟化，支持按拍摄时间排序。Switch 与电脑来源共用。</summary>
+/// <summary>单个游戏（或全部）的照片网格。行分块 + ListBox 虚拟化，支持按拍摄时间排序和调整预览大小。Switch 与电脑来源共用。</summary>
 public partial class GameGridViewModel : ObservableObject
 {
+    /// <summary>视图量出真实宽度之前用的默认值（窗口默认宽度下的可用宽度）。</summary>
+    private const double DefaultViewportWidth = 1200;
+
     private readonly MainViewModel _main;
     private readonly List<PhotoItemViewModel> _items;
+    private double _viewportWidth = DefaultViewportWidth;
 
     public GameGridViewModel(string title, IReadOnlyList<AlbumItem> items, MainViewModel main)
     {
         Title = title;
         _main = main;
+        _zoomLevel = PhotoGridLayout.ClampLevel(main.Settings.PhotoZoomLevel);
         _items = items.Select(i => new PhotoItemViewModel(i, main)).ToList();
         foreach (var item in _items)
         {
@@ -29,8 +34,11 @@ public partial class GameGridViewModel : ObservableObject
         }
 
         SortItems();
-        SetColumns(4);
+        ApplyLayout();
     }
+
+    /// <summary>缩放或窗口变化导致行重排，参数是重排前视野里第一张照片的序号，视图据此滚回原位。</summary>
+    public event Action<int>? RowsReflowed;
 
     public string Title { get; }
     public IReadOnlyList<PhotoItemViewModel> Items => _items;
@@ -41,16 +49,64 @@ public partial class GameGridViewModel : ObservableObject
     [ObservableProperty] private string _selectedText = "";
     [ObservableProperty] private bool _canSaveSelected;
     [ObservableProperty] private GridSortMode _sortMode = GridSortMode.NewestFirst;
+    [ObservableProperty] private int _zoomLevel;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RowHeight))]
+    private double _cardWidth;
 
     public bool IsNewestFirst => SortMode == GridSortMode.NewestFirst;
 
+    public double RowHeight => PhotoGridLayout.RowHeight(CardWidth);
+
+    /// <summary>视野里第一张照片的序号，由视图在滚动时更新。</summary>
+    public int FirstVisibleIndex { get; set; }
+
     partial void OnSortModeChanged(GridSortMode value) => OnPropertyChanged(nameof(IsNewestFirst));
 
-    public void SetColumns(int columns)
+    partial void OnZoomLevelChanged(int value)
     {
-        if (columns < 2)
+        _main.SavePhotoZoomLevel(value);
+        ApplyLayout();
+    }
+
+    /// <summary>档位加减（Ctrl+滚轮）。</summary>
+    public void ChangeZoom(int delta) => ZoomLevel = PhotoGridLayout.ClampLevel(ZoomLevel + delta);
+
+    public void SetViewportWidth(double width)
+    {
+        _viewportWidth = width;
+        ApplyLayout();
+    }
+
+    /// <summary>视野停稳后由视图调用：卡片够大时给看得见的照片加载原图，其余的取消排队。</summary>
+    public void UpdateHighRes(int firstIndex, int count)
+    {
+        var wanted = CardWidth >= PhotoGridLayout.HighResFromWidth;
+        for (var i = 0; i < _items.Count; i++)
         {
-            columns = 2;
+            if (wanted && i >= firstIndex && i < firstIndex + count)
+            {
+                _ = _items[i].LoadHighResAsync();
+            }
+            else
+            {
+                _items[i].CancelHighRes();
+            }
+        }
+    }
+
+    private void ApplyLayout()
+    {
+        var (columns, cardWidth) = PhotoGridLayout.Compute(_viewportWidth, ZoomLevel);
+        CardWidth = cardWidth;
+        if (cardWidth < PhotoGridLayout.HighResFromWidth)
+        {
+            // 缩小回去后缩略图已经够用，不再占着原图的内存
+            foreach (var item in _items)
+            {
+                item.ReleaseHighRes();
+            }
         }
 
         if (columns == Columns)
@@ -58,8 +114,10 @@ public partial class GameGridViewModel : ObservableObject
             return;
         }
 
+        var anchor = FirstVisibleIndex;
         Columns = columns;
         RebuildRows();
+        RowsReflowed?.Invoke(anchor);
     }
 
     [RelayCommand]

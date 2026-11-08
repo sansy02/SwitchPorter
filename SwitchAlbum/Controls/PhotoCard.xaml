@@ -2,15 +2,19 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:res="clr-namespace:SwitchAlbum.Resources"
-             xmlns:conv="clr-namespace:SwitchAlbum.Converters"
-             Width="212" Height="186">
+             xmlns:conv="clr-namespace:SwitchAlbum.Converters">
     <UserControl.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
     </UserControl.Resources>
     <Border x:Name="Root" Background="{DynamicResource SurfaceBrush}" CornerRadius="12"
-            ClipToBounds="True" Cursor="Hand"
+            ClipToBounds="True" Cursor="Hand" RenderTransformOrigin="0.5,0.5"
             MouseEnter="Root_MouseEnter" MouseLeave="Root_MouseLeave"
             MouseLeftButtonDown="Root_MouseLeftButtonDown">
+        <Border.ContextMenu>
+            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                <MenuItem Header="{x:Static res:Strings.Cover_SetFromPhoto}" Command="{Binding SetAsCoverCommand}"/>
+            </ContextMenu>
+        </Border.ContextMenu>
         <Border.Style>
             <Style TargetType="Border">
                 <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
@@ -25,18 +29,18 @@
             </Style>
         </Border.Style>
         <Border.RenderTransform>
-            <ScaleTransform x:Name="RootScale" CenterX="106" CenterY="93"/>
+            <ScaleTransform x:Name="RootScale"/>
         </Border.RenderTransform>
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="132"/>
+                <RowDefinition x:Name="ImageRow"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- 缩略图 -->
+            <!-- 缩略图：高质量缩放，缩小后的文字不发虚；Uniform 不裁边，画面底部的对话不会被切掉 -->
             <Grid Grid.Row="0">
                 <Rectangle Fill="{DynamicResource PlaceholderBrush}"/>
-                <Image Source="{Binding ThumbPath}" Stretch="UniformToFill"/>
+                <Image Source="{Binding DisplayPath, TargetNullValue={x:Null}}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
 
                 <!-- 视频徽标 -->
                 <Border Background="#99000000" CornerRadius="8" Padding="8,3" HorizontalAlignment="Right"

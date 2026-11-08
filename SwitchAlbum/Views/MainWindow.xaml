@@ -119,7 +119,7 @@
             </StackPanel>
 
             <!-- ============ 灯箱浮层 ============ -->
-            <Grid Background="{DynamicResource OverlayBrush}">
+            <Grid Background="{DynamicResource OverlayBrush}" MouseWheel="Lightbox_MouseWheel">
                 <Grid.Style>
                     <Style TargetType="Grid">
                         <Style.Triggers>
@@ -151,7 +151,7 @@
                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0"/>
 
                 <Grid Margin="96,40,96,88">
-                    <Image x:Name="LightboxImage" Source="{Binding Lightbox.FullPath}" Stretch="Uniform" RenderTransformOrigin="0.5,0.5">
+                    <Image x:Name="LightboxImage" Source="{Binding Lightbox.FullPath, TargetNullValue={x:Null}}" Stretch="Uniform" RenderTransformOrigin="0.5,0.5">
                         <Image.RenderTransform>
                             <ScaleTransform x:Name="LightboxScale"/>
                         </Image.RenderTransform>
@@ -171,6 +171,11 @@
                 <Border Background="#66000000" CornerRadius="10" Padding="16,8"
                         HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,26">
                     <StackPanel Orientation="Horizontal">
+                        <CheckBox IsChecked="{Binding Lightbox.Current.IsSelected, Mode=TwoWay}" Focusable="False"
+                                  VerticalAlignment="Center" Style="{StaticResource PhotoCheckBoxStyle}"/>
+                        <TextBlock Text="{x:Static res:Strings.Lightbox_Select}" Foreground="White" FontSize="13"
+                                   VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        <TextBlock Text="  ·  " Foreground="#99FFFFFF" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding Lightbox.IndexText}" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Text="  ·  " Foreground="#99FFFFFF" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding Lightbox.CaptionText}" Foreground="#DDFFFFFF" FontSize="13" VerticalAlignment="Center"/>

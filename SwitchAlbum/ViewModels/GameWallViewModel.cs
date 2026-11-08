@@ -29,6 +29,9 @@ public sealed partial class GameWallViewModel : ObservableObject
 
     public ObservableCollection<GameCardViewModel> Cards { get; } = new();
 
+    /// <summary>所有卡片，不受搜索过滤影响。</summary>
+    public IReadOnlyList<GameCardViewModel> AllCards => _allCards;
+
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private bool _noResults;
 
