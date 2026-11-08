@@ -30,6 +30,16 @@ public partial class GameCard : UserControl
         };
     }
 
+    private void CoverButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (Root.ContextMenu is { } menu)
+        {
+            menu.PlacementTarget = CoverButton;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+    }
+
     private void Root_MouseEnter(object sender, MouseEventArgs e) => _motion.Enter();
 
     private void Root_MouseLeave(object sender, MouseEventArgs e) => _motion.Leave();

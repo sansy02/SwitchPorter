@@ -194,6 +194,26 @@ public partial class MainWindow : Window
             case Key.Right:
                 lightbox.NextCommand.Execute(null);
                 break;
+            case Key.Space:
+                lightbox.ToggleSelectedCommand.Execute(null);
+                break;
+            default:
+                return;
         }
+
+        // 灯箱盖在网格上面：按键不能再传给背后的控件（否则翻页时焦点在滑块上会顺带改缩放）
+        e.Handled = true;
+    }
+
+    private void Lightbox_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        var lightbox = _main?.Lightbox;
+        if (lightbox == null)
+        {
+            return;
+        }
+
+        (e.Delta > 0 ? lightbox.PrevCommand : lightbox.NextCommand).Execute(null);
+        e.Handled = true;
     }
 }

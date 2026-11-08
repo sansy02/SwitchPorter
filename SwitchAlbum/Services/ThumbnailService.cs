@@ -14,6 +14,10 @@ public sealed class ThumbnailService
     private readonly Dictionary<string, Task<string?>> _inFlight = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _semaphore = new(2);
 
+    // 原图分两条队：网格里的高清预览排队时，灯箱翻页不用跟在后面等
+    private readonly SemaphoreSlim _fullImageSlots = new(2);
+    private readonly SemaphoreSlim _backgroundFullImageSlots = new(2);
+
     public ThumbnailService(string? cacheDir = null)
     {
         _cacheDir = cacheDir ?? Path.Combine(
@@ -73,6 +77,8 @@ public sealed class ThumbnailService
         await _semaphore.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            Directory.CreateDirectory(_cacheDir); // 「清除缓存」会把目录整个删掉
+
             // 优先设备缩略图
             try
             {
@@ -120,10 +126,11 @@ public sealed class ThumbnailService
         }
     }
 
-    /// <summary>获取原图（供大图预览），按同样 key 缓存。</summary>
+    /// <summary>获取原图（供大图预览与网格高清预览），按同样 key 缓存。取消时抛 OperationCanceledException。</summary>
+    /// <param name="background">网格的高清预览：和灯箱分开排队，灯箱优先响应。</param>
     public async Task<string?> GetFullImageAsync(
         string deviceId, IMediaDeviceSession session, string devicePath, string fileName,
-        DateTime? lastModified, long size, CancellationToken ct)
+        DateTime? lastModified, long size, CancellationToken ct, bool background = false)
     {
         var key = ComputeKey(deviceId, devicePath, lastModified, size);
         var cachePath = Path.Combine(_cacheDir, "full-" + key + Path.GetExtension(fileName));
@@ -132,17 +139,48 @@ public sealed class ThumbnailService
             return cachePath;
         }
 
-        var tmp = cachePath + ".part";
+        var slots = background ? _backgroundFullImageSlots : _fullImageSlots;
+        await slots.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            await session.DownloadFileAsync(devicePath, tmp, ct).ConfigureAwait(false);
-            File.Move(tmp, cachePath, overwrite: true);
-            return cachePath;
+            if (File.Exists(cachePath))
+            {
+                return cachePath; // 排队期间另一条队已经下好了
+            }
+
+            Directory.CreateDirectory(_cacheDir);
+
+            // 临时名每次不同：灯箱和网格可能同时下载同一张图
+            var tmp = cachePath + "." + Guid.NewGuid().ToString("N") + ".part";
+            try
+            {
+                await session.DownloadFileAsync(devicePath, tmp, ct).ConfigureAwait(false);
+                File.Move(tmp, cachePath, overwrite: true);
+                return cachePath;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // 另一条队抢先完成且文件正在显示时覆盖会失败，这种情况直接用它的结果
+                if (File.Exists(cachePath))
+                {
+                    return cachePath;
+                }
+
+                Log.Info($"下载原图失败: {devicePath} — {ex.Message}");
+                return null;
+            }
+            finally
+            {
+                TryDelete(tmp);
+            }
         }
-        catch
+        finally
         {
-            TryDelete(tmp);
-            return null;
+            slots.Release();
         }
     }
 

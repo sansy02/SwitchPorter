@@ -316,6 +316,12 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    public void SavePhotoZoomLevel(int level)
+    {
+        _settings.Current.PhotoZoomLevel = level;
+        _settings.Save();
+    }
+
     public void SaveWindowBounds(double left, double top, double width, double height, bool maximized)
     {
         _settings.Current.WindowLeft = left;
@@ -714,7 +720,7 @@ public partial class MainViewModel : ObservableObject
 
     public void OpenLightbox(IReadOnlyList<PhotoItemViewModel> items, PhotoItemViewModel current)
     {
-        var lightbox = new LightboxViewModel(items, current, LoadFullImageAsync, item => _ = OpenVideoAsync(item));
+        var lightbox = new LightboxViewModel(items, current, (item, ct) => LoadOriginalAsync(item, ct), item => _ = OpenVideoAsync(item));
         lightbox.Closed += CloseLightbox;
         Lightbox = lightbox;
     }
@@ -763,7 +769,11 @@ public partial class MainViewModel : ObservableObject
             item.Item.LastModified, item.Item.Size, CancellationToken.None);
     }
 
-    private Task<string?> LoadFullImageAsync(PhotoItemViewModel item)
+    /// <summary>网格里的大卡片要用的原图。传输时不加载，不和保存任务抢 MTP 通道。</summary>
+    public Task<string?> LoadHighResAsync(PhotoItemViewModel item, CancellationToken ct)
+        => IsTransferring ? Task.FromResult<string?>(null) : LoadOriginalAsync(item, ct, background: true);
+
+    private Task<string?> LoadOriginalAsync(PhotoItemViewModel item, CancellationToken ct, bool background = false)
     {
         var session = ActiveSession;
         var deviceKey = ActiveDeviceKey;
@@ -781,7 +791,7 @@ public partial class MainViewModel : ObservableObject
 
         return _thumbnailService.GetFullImageAsync(
             deviceKey, session, item.Item.DevicePath, item.Item.FileName,
-            item.Item.LastModified, item.Item.Size, CancellationToken.None);
+            item.Item.LastModified, item.Item.Size, ct, background);
     }
 
     public async Task OpenVideoAsync(PhotoItemViewModel item)
@@ -791,7 +801,7 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        var path = await LoadFullImageAsync(item);
+        var path = await LoadOriginalAsync(item, CancellationToken.None);
         if (path == null)
         {
             ShowToast(string.Format(Strings.Msg_SaveFailed, item.FileName));
@@ -813,6 +823,78 @@ public partial class MainViewModel : ObservableObject
     {
         var urls = titleId != null ? _titleDb?.GetCoverUrls(titleId) : null;
         return _coverService.ResolveAsync(titleId, title, urls, CancellationToken.None);
+    }
+
+    public bool HasCustomCover(string title) => _coverService.GetOverride(title) != null;
+
+    /// <summary>游戏卡片「更换封面」：从电脑里选一张图片。</summary>
+    public async Task PickCoverAsync(GameCardViewModel card)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = string.Format(Strings.Cover_PickTitle, card.Title),
+            Filter = Strings.Cover_PickFilter,
+        };
+
+        if (_owner != null && dialog.ShowDialog(_owner) == true)
+        {
+            await ApplyCoverAsync(card.Title, dialog.FileName);
+        }
+    }
+
+    /// <summary>照片右键「设为这个游戏的封面」。</summary>
+    public async Task SetCoverFromPhotoAsync(PhotoItemViewModel photo)
+    {
+        var path = await LoadOriginalAsync(photo, CancellationToken.None);
+        if (path == null)
+        {
+            ShowToast(Strings.Cover_BadImage);
+            return;
+        }
+
+        await ApplyCoverAsync(photo.Item.GameTitle, path);
+    }
+
+    private async Task ApplyCoverAsync(string title, string imagePath)
+    {
+        try
+        {
+            await _coverService.SetOverrideAsync(title, imagePath);
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"更换封面失败: {imagePath} — {ex.Message}");
+            ShowToast(Strings.Cover_BadImage);
+            return;
+        }
+
+        await ReloadCoverCardsAsync(title);
+        ShowToast(string.Format(Strings.Cover_Changed, title));
+    }
+
+    public async Task ResetCoverAsync(GameCardViewModel card)
+    {
+        if (!_coverService.ClearOverride(card.Title))
+        {
+            ShowToast(Strings.Cover_ResetFailed);
+            return;
+        }
+
+        await ReloadCoverCardsAsync(card.Title);
+        ShowToast(string.Format(Strings.Cover_Restored, card.Title));
+    }
+
+    /// <summary>同一款游戏可能同时出现在 Switch 相册和「电脑里的照片」，两边一起刷新。</summary>
+    private async Task ReloadCoverCardsAsync(string title)
+    {
+        var name = TitleDbService.Normalize(title);
+        foreach (var card in new[] { Wall, LocalWall }
+                     .Where(w => w != null)
+                     .SelectMany(w => w!.AllCards)
+                     .Where(c => !c.IsAllCard && TitleDbService.Normalize(c.Title) == name))
+        {
+            await card.ReloadCoverAsync();
+        }
     }
 
     // =====================================================================

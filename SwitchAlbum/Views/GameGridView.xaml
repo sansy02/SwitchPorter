@@ -2,7 +2,8 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:res="clr-namespace:SwitchAlbum.Resources"
-             xmlns:controls="clr-namespace:SwitchAlbum.Controls">
+             xmlns:controls="clr-namespace:SwitchAlbum.Controls"
+             xmlns:vm="clr-namespace:SwitchAlbum.ViewModels">
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -12,12 +13,22 @@
         <!-- 工具栏 -->
         <Border Grid.Row="0" Padding="18,0,18,12">
             <Grid>
-                <StackPanel Orientation="Horizontal">
-                    <Button Content="{x:Static res:Strings.Btn_Back}"
-                            Command="{Binding DataContext.BackToWallCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            Style="{StaticResource SubtleButtonStyle}" Padding="12,6" FontSize="12"/>
-                    <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"
-                               Margin="14,0,0,0"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Content="{x:Static res:Strings.Btn_Back}"
+                        Command="{Binding DataContext.BackToWallCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        Style="{StaticResource SubtleButtonStyle}" Padding="12,6" FontSize="12"/>
+
+                <!-- 游戏名可能很长：过长时省略，不再压到右边的按钮上 -->
+                <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"
+                           Margin="14,0,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <TextBlock Text="{Binding SelectedText}" Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center" Margin="18,0,0,0" FontSize="12.5"/>
 
@@ -52,9 +63,22 @@
                             </Style>
                         </Button.Style>
                     </Button>
+
+                    <!-- 预览大小 -->
+                    <Border Width="1" Height="18" Background="{DynamicResource BorderBrush}"
+                            VerticalAlignment="Center" Margin="12,0"/>
+                    <StackPanel Orientation="Horizontal" Background="Transparent" ToolTip="{x:Static res:Strings.Zoom_Tooltip}">
+                        <TextBlock Text="{x:Static res:Strings.Zoom_Small}" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <Slider Width="92" Margin="8,0" Minimum="0" Maximum="{x:Static vm:PhotoGridLayout.ZoomSliderMaximum}"
+                                TickFrequency="1" IsSnapToTickEnabled="True" IsMoveToPointEnabled="True"
+                                Value="{Binding ZoomLevel}" Style="{StaticResource ZoomSliderStyle}"/>
+                        <TextBlock Text="{x:Static res:Strings.Zoom_Large}" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="16,0,0,0">
                     <Button Content="{x:Static res:Strings.Btn_SelectUnsaved}"
                             Command="{Binding DataContext.SelectUnsavedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             Style="{StaticResource SubtleButtonStyle}" Padding="10,5" FontSize="12"/>
@@ -71,7 +95,9 @@
         <!-- 照片网格（行分块 + ListBox 虚拟化） -->
         <ListBox Grid.Row="1" ItemsSource="{Binding Rows}" Background="Transparent" BorderThickness="0"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 Padding="14,0,14,18" x:Name="GridList" SizeChanged="GridList_SizeChanged">
+                 VirtualizingPanel.ScrollUnit="Pixel"
+                 Padding="14,0,14,18" x:Name="GridList" SizeChanged="GridList_SizeChanged"
+                 PreviewMouseWheel="GridList_PreviewMouseWheel" ScrollViewer.ScrollChanged="GridList_ScrollChanged">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -95,7 +121,8 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <controls:PhotoCard Margin="4"/>
+                                <controls:PhotoCard Margin="4"
+                                                    CardWidth="{Binding DataContext.CardWidth, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

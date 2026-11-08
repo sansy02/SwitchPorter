@@ -29,6 +29,10 @@ public sealed partial class GameCardViewModel : ObservableObject
     [ObservableProperty] private string _subtitle;
     [ObservableProperty] private string? _coverPath;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ResetCoverCommand))]
+    private bool _hasCustomCover;
+
     public string? TitleId { get; private set; }
     public string? DevicePath { get; }
     public int PhotoCount => _items.Count(i => !i.IsVideo);
@@ -38,9 +42,23 @@ public sealed partial class GameCardViewModel : ObservableObject
     [RelayCommand]
     private void Open() => _main.OpenGame(this);
 
+    [RelayCommand]
+    private Task ChangeCoverAsync() => _main.PickCoverAsync(this);
+
+    [RelayCommand(CanExecute = nameof(HasCustomCover))]
+    private Task ResetCoverAsync() => _main.ResetCoverAsync(this);
+
     public void RefreshSaved()
     {
         Subtitle = ComputeSubtitle();
+    }
+
+    /// <summary>用户换了封面或恢复默认后重新取一次。</summary>
+    public Task ReloadCoverAsync()
+    {
+        CoverPath = null;
+        Interlocked.Exchange(ref _coverLoadStarted, 0);
+        return EnsureCoverAsync();
     }
 
     public async Task EnsureCoverAsync()
@@ -56,6 +74,8 @@ public sealed partial class GameCardViewModel : ObservableObject
         {
             CoverPath = path;
         }
+
+        HasCustomCover = _main.HasCustomCover(Title);
     }
 
     /// <summary>游戏库在线更新后（如补齐了 Switch 2 游戏），用新的 TitleId 重新取封面。</summary>

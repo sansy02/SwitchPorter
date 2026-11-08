@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace SwitchAlbum.Services;
 
@@ -50,6 +51,9 @@ public sealed class TitleDbService : ITitleDb
         "特别版",
         "demo",
     };
+
+    private static readonly Regex CompositeName = new(
+        @"^(?<outer>[^(（\[]+)[(（\[](?<inner>[^)）\]]+)[)）\]]", RegexOptions.Compiled);
 
     private readonly Dictionary<string, TitleNames> _byId = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _byName = new(StringComparer.Ordinal);
@@ -103,18 +107,26 @@ public sealed class TitleDbService : ITitleDb
                 _coverUrls[tid] = urls;
             }
 
-            RegisterName(names.Zh, tid);
-            RegisterName(names.ZhHant, tid);
-            RegisterName(names.En, tid);
-            RegisterName(names.Ja, tid);
+            // titledb 里约 4 成是 DLC / 主题包。相册文件夹只会是游戏本体，DLC 名称进表只会抢走匹配
+            if (IsBaseTitle(tid))
+            {
+                RegisterNameVariants(names.Zh, tid);
+                RegisterNameVariants(names.ZhHant, tid);
+                RegisterNameVariants(names.En, tid);
+                RegisterNameVariants(names.Ja, tid);
+            }
         }
 
-        // 包含匹配按名称长度降序尝试：最长命中最具体（如「马力欧卡丁车8 豪华版」优先于「马力欧卡丁车8」）
+        // 前缀匹配按名称长度降序尝试：最长命中最具体（如「马力欧卡丁车8 豪华版」优先于「马力欧卡丁车8」）
         _byNameEntries = _byName
             .Select(kv => (Name: kv.Key, Tid: kv.Value))
             .OrderByDescending(e => e.Name.Length)
             .ToArray();
     }
+
+    /// <summary>16 位 TitleId 中游戏本体以 000 结尾（DLC 为 001 起，更新包为 800）；在线数据的 "ns2-…" 都是本体。</summary>
+    private static bool IsBaseTitle(string titleId)
+        => titleId.Length != 16 || titleId.EndsWith("000", StringComparison.Ordinal);
 
     public string? GetNameByTitleId(string titleId)
     {
@@ -166,16 +178,7 @@ public sealed class TitleDbService : ITitleDb
 
                 foreach (var name in names)
                 {
-                    RegisterName(name, title.Id);
-
-                    // 「Splatoon Raiders (斯普拉遁 塗擊隊)」这类带括号的名称：括号内外分别注册
-                    var outer = StripTrailingParenthetical(name);
-                    if (outer != name.Trim())
-                    {
-                        RegisterName(outer, title.Id);
-                        var inner = name.Trim()[(outer.Length)..].Trim().Trim('(', ')', '（', '）', '[', ']').Trim();
-                        RegisterName(inner, title.Id);
-                    }
+                    RegisterNameVariants(name, title.Id);
                 }
             }
 
@@ -250,48 +253,76 @@ public sealed class TitleDbService : ITitleDb
             }
         }
 
-        // 4. 包含匹配（较短方 ≥ 4 字符防误命中）：
-        //    方向 A 文件夹包含库名（文件夹带额外后缀/捆绑）→ 最长库名最具体；
-        //    方向 B 库名包含文件夹（文件夹是库名的一部分）→ 最短库名最接近。
+        // 4. 前缀匹配。宁可显示「无封面」让用户自己换，也不要显示别的游戏的封面，所以只认开头相同的名称，
+        //    中间或结尾碰巧相同的不算（否则 Rewrite 会命中 RITE、SWEET POOL 会命中 POOL）。
         var folderNorm = Normalize(folderName);
-        if (folderNorm.Length >= 4)
+        if (!IsSpecificName(folderNorm))
         {
-            foreach (var (name, tid) in _byNameEntries)
+            return null;
+        }
+
+        // 方向 A：文件夹 = 库名 + 额外内容（版本后缀/捆绑），最长的库名最具体
+        foreach (var (name, tid) in _byNameEntries)
+        {
+            if (name.Length < folderNorm.Length
+                && folderNorm.StartsWith(name, StringComparison.Ordinal)
+                && IsSpecificName(name)
+                && IsSameGameTail(folderName, name.Length))
             {
-                if (name.Length < 4)
-                {
-                    continue;
-                }
-
-                if (folderNorm.Contains(name, StringComparison.Ordinal))
-                {
-                    return tid;
-                }
-            }
-
-            string? bestTid = null;
-            var bestLen = int.MaxValue;
-            foreach (var (name, tid) in _byNameEntries)
-            {
-                if (name.Length < 4 || name.Length >= bestLen)
-                {
-                    continue;
-                }
-
-                if (name.Contains(folderNorm, StringComparison.Ordinal))
-                {
-                    bestTid = tid;
-                    bestLen = name.Length;
-                }
-            }
-
-            if (bestTid != null)
-            {
-                return bestTid;
+                return tid;
             }
         }
 
-        return null;
+        // 方向 B：库名 = 文件夹 + 额外内容，取最短的。其余候选都得是它的延伸（本体、Demo、豪华版这类同一款游戏）；
+        // 否则是几款不同的游戏碰巧开头相同，无法判断，不猜
+        var candidates = _byNameEntries
+            .Where(e => e.Name.Length > folderNorm.Length
+                        && e.Name.StartsWith(folderNorm, StringComparison.Ordinal)
+                        && !char.IsDigit(e.Name[folderNorm.Length]))
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        var shortest = candidates[^1]; // 表按长度降序
+        return candidates.All(c => c.Name.StartsWith(shortest.Name, StringComparison.Ordinal)) ? shortest.Tid : null;
+    }
+
+    /// <summary>名称足够长才参与前缀匹配：CJK 至少 4 字、拉丁字母至少 8 个（Summer、Tetris 这类词太泛）。</summary>
+    private static bool IsSpecificName(string normalized)
+        => normalized.Sum(c => c is >= '\u3040' and <= '\u9FFF' ? 2 : 1) >= 8;
+
+    /// <summary>
+    /// 文件夹名去掉匹配到的前缀后，剩下的部分是否仍是同一款游戏：
+    /// 不能断在单词中间（SCRAMBLED ≠ Scramble，VIII ≠ VII），后面也不能紧跟续作编号（Wizard of Legend II ≠ Wizard of Legend）。
+    /// </summary>
+    private static bool IsSameGameTail(string folderName, int normalizedLength)
+    {
+        var index = 0;
+        for (var kept = 0; index < folderName.Length && kept < normalizedLength; index++)
+        {
+            if (Normalize(folderName[index].ToString()).Length > 0)
+            {
+                kept++;
+            }
+        }
+
+        if (index >= folderName.Length)
+        {
+            return true;
+        }
+
+        if (index > 0 && char.IsAsciiLetterOrDigit(folderName[index]) && char.IsAsciiLetterOrDigit(folderName[index - 1]))
+        {
+            return false;
+        }
+
+        var nextWord = new string(folderName[index..]
+            .SkipWhile(c => !char.IsLetterOrDigit(c))
+            .TakeWhile(char.IsLetterOrDigit)
+            .ToArray());
+        return nextWord.Length == 0 || !(nextWord.All(char.IsDigit) || nextWord.All("IVXivx".Contains));
     }
 
     private IEnumerable<string> NormalizeCandidates(string name)
@@ -373,6 +404,28 @@ public sealed class TitleDbService : ITitleDb
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// 注册名称及其括号内外的部分。库里不少名称是复合写法，如「Xenoblade2 (ゼノブレイド2) Nintendo Switch 2 Edition」、
+    /// 「Splatoon Raiders (斯普拉遁 塗擊隊)」，相册文件夹只会是其中一种语言。
+    /// </summary>
+    private void RegisterNameVariants(string? name, string tid)
+    {
+        RegisterName(name, tid);
+        var match = name == null ? Match.Empty : CompositeName.Match(name);
+        if (!match.Success)
+        {
+            return;
+        }
+
+        foreach (var part in new[] { match.Groups["outer"].Value, match.Groups["inner"].Value })
+        {
+            if (IsSpecificName(Normalize(part)))
+            {
+                RegisterName(part, tid);
+            }
+        }
     }
 
     private void RegisterName(string? name, string tid)

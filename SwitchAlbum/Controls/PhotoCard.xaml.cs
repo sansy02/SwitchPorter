@@ -8,12 +8,17 @@ namespace SwitchAlbum.Controls;
 
 public partial class PhotoCard : UserControl
 {
+    public static readonly DependencyProperty CardWidthProperty = DependencyProperty.Register(
+        nameof(CardWidth), typeof(double), typeof(PhotoCard),
+        new PropertyMetadata(PhotoGridLayout.ZoomWidths[PhotoGridLayout.DefaultZoomLevel], (d, _) => ((PhotoCard)d).ApplyCardWidth()));
+
     private readonly CardMotion _motion;
 
     public PhotoCard()
     {
         InitializeComponent();
         _motion = new CardMotion(Root, RootScale, hoverScale: 1.02, liftBy: 3);
+        ApplyCardWidth();
         DataContextChanged += (_, _) =>
         {
             if (DataContext is PhotoItemViewModel viewModel)
@@ -28,6 +33,19 @@ public partial class PhotoCard : UserControl
                 _ = viewModel.LoadThumbAsync();
             }
         };
+    }
+
+    public double CardWidth
+    {
+        get => (double)GetValue(CardWidthProperty);
+        set => SetValue(CardWidthProperty, value);
+    }
+
+    private void ApplyCardWidth()
+    {
+        Width = CardWidth;
+        Height = PhotoGridLayout.CardHeight(CardWidth);
+        ImageRow.Height = new GridLength(PhotoGridLayout.ImageHeight(CardWidth));
     }
 
     private void Root_MouseEnter(object sender, MouseEventArgs e) => _motion.Enter();

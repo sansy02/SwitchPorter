@@ -1,6 +1,7 @@
 using SwitchAlbum.Models;
 using SwitchAlbum.Services;
 using SwitchAlbum.Services.Parsing;
+using SwitchAlbum.ViewModels;
 
 var tests = new List<(string Name, Func<Task<bool>> Run)>();
 
@@ -192,12 +193,12 @@ static TitleDbService SyntheticDb()
 {
     var json = """
     {
-      "0100AAAA00000001": { "zh": "塞尔达传说 王国之泪", "en": "The Legend of Zelda: Tears of the Kingdom" },
-      "0100AAAA00000002": { "zh": "超级马力欧兄弟 惊奇" },
-      "0100AAAA00000003": { "en": "Splatoon 3" },
-      "0100AAAA00000004": { "zht": "霍格華茲的傳承" },
-      "0100AAAA00000005": { "ja": "ゼノブレイド２" },
-      "0100AAAA00000006": { "zh": "神之天平 Revision" }
+      "0100AAAA00001000": { "zh": "塞尔达传说 王国之泪", "en": "The Legend of Zelda: Tears of the Kingdom" },
+      "0100AAAA00002000": { "zh": "超级马力欧兄弟 惊奇" },
+      "0100AAAA00003000": { "en": "Splatoon 3" },
+      "0100AAAA00004000": { "zht": "霍格華茲的傳承" },
+      "0100AAAA00005000": { "ja": "ゼノブレイド２" },
+      "0100AAAA00006000": { "zh": "神之天平 Revision" }
     }
     """;
     var t2s = "華\t华\n茲\t兹\n傳\t传\n承\t承\n";
@@ -209,31 +210,31 @@ static TitleDbService SyntheticDb()
 Add("模糊反查: Switch 2 后缀剥离", () =>
 {
     var db = SyntheticDb();
-    return db.GetTitleIdByFolderName("塞尔达传说 王国之泪 Nintendo Switch 2 Edition") == "0100AAAA00000001"
-        && db.GetTitleIdByFolderName("塞尔达传说 王国之泪 體驗版") == "0100AAAA00000001"
-        && db.GetTitleIdByFolderName("塞尔达传说 王国之泪 DEMO") == "0100AAAA00000001";
+    return db.GetTitleIdByFolderName("塞尔达传说 王国之泪 Nintendo Switch 2 Edition") == "0100AAAA00001000"
+        && db.GetTitleIdByFolderName("塞尔达传说 王国之泪 體驗版") == "0100AAAA00001000"
+        && db.GetTitleIdByFolderName("塞尔达传说 王国之泪 DEMO") == "0100AAAA00001000";
 });
 Add("模糊反查: 括号注释剥离", () =>
 {
     var db = SyntheticDb();
-    return db.GetTitleIdByFolderName("Splatoon 3（斯普拉遁 3）") == "0100AAAA00000003"
-        && db.GetTitleIdByFolderName("Splatoon 3 (スプラトゥーン3)") == "0100AAAA00000003";
+    return db.GetTitleIdByFolderName("Splatoon 3（斯普拉遁 3）") == "0100AAAA00003000"
+        && db.GetTitleIdByFolderName("Splatoon 3 (スプラトゥーン3)") == "0100AAAA00003000";
 });
 Add("模糊反查: 包含匹配（后缀+捆绑）", () =>
 {
     var db = SyntheticDb();
-    return db.GetTitleIdByFolderName("超级马力欧兄弟 惊奇 Nintendo Switch 2 Edition + 同游铃铃公园") == "0100AAAA00000002"
-        && db.GetTitleIdByFolderName("神之天平") == "0100AAAA00000006";
+    return db.GetTitleIdByFolderName("超级马力欧兄弟 惊奇 Nintendo Switch 2 Edition + 同游铃铃公园") == "0100AAAA00002000"
+        && db.GetTitleIdByFolderName("神之天平") == "0100AAAA00006000";
 });
 Add("模糊反查: 品牌别名（繁体霍格華茲→霍格沃茨之遗）", () =>
 {
     var db = SyntheticDb();
-    return db.GetTitleIdByFolderName("霍格沃茨之遗") == "0100AAAA00000004";
+    return db.GetTitleIdByFolderName("霍格沃茨之遗") == "0100AAAA00004000";
 });
 Add("模糊反查: 日文名注册与全角数字", () =>
 {
     var db = SyntheticDb();
-    return db.GetTitleIdByFolderName("ゼノブレイド2") == "0100AAAA00000005";
+    return db.GetTitleIdByFolderName("ゼノブレイド2") == "0100AAAA00005000";
 });
 Add("模糊反查: 真实库 Switch 2 风格文件夹名", () =>
 {
@@ -777,6 +778,333 @@ Add("NS2: 合并后中文/日文/英文文件夹名都能找到封面", () =>
         && dk != null && db.GetCoverUrls(dk).Count >= 1 && splat != null && splat.StartsWith("ns2-")
         && db.GetCoverUrls(zhs).Count >= 1 && db.GetCoverUrls(splat)[0].StartsWith("https://img-eshop.cdn.nintendo.net/i/")
         && totk == "0100F2C0115B6000";
+});
+
+// ---------- 预览大小 ----------
+Add("预览大小: 默认窗口下每一档的列数都不同", () =>
+{
+    var columns = Enumerable.Range(0, PhotoGridLayout.MaxZoomLevel + 1)
+        .Select(level => PhotoGridLayout.Compute(1207, level).Columns)
+        .ToArray();
+    return columns.SequenceEqual(new[] { 6, 5, 4, 3, 2 });
+});
+Add("预览大小: 卡片铺满一行且不超出", () =>
+{
+    foreach (var width in new[] { 947.0, 1207, 1847, 2487 })
+    {
+        for (var level = 0; level <= PhotoGridLayout.MaxZoomLevel; level++)
+        {
+            var (columns, card) = PhotoGridLayout.Compute(width, level);
+            var used = columns * (card + PhotoGridLayout.CardGap);
+            if (used > width || used < width - columns)
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+});
+Add("预览大小: 最大档卡片足够宽（文字冒险的对话看得清）", () =>
+    PhotoGridLayout.Compute(1207, PhotoGridLayout.MaxZoomLevel).CardWidth >= 590
+    && PhotoGridLayout.Compute(1847, PhotoGridLayout.MaxZoomLevel).CardWidth >= 590);
+Add("预览大小: 窗口很窄时至少 2 列，档位越界被夹住", () =>
+    PhotoGridLayout.Compute(500, PhotoGridLayout.MaxZoomLevel).Columns == 2
+    && PhotoGridLayout.Compute(1207, 99).Columns == 2
+    && PhotoGridLayout.Compute(1207, -5).Columns == 6);
+Add("预览大小: 图片区是 16:9（截图不裁边）", () =>
+    Math.Abs(PhotoGridLayout.ImageHeight(600) / 600 - 9.0 / 16) < 0.002
+    && PhotoGridLayout.CardHeight(600) == PhotoGridLayout.ImageHeight(600) + PhotoGridLayout.InfoHeight);
+AddAsync("预览大小: 调整后记住档位，重排时告知视野位置", async () =>
+{
+    var dir = TempDir();
+    Directory.CreateDirectory(dir);
+    try
+    {
+        var settings = new SettingsService(Path.Combine(dir, "settings.json"));
+        var tracker = new DuplicateTracker(Path.Combine(dir, "saved.json"));
+        var main = new SwitchAlbum.ViewModels.MainViewModel(
+            settings, new ThemeService(settings), tracker, new SaveService(tracker), new PhoneSaveService(tracker, settings),
+            new ThumbnailService(Path.Combine(dir, "thumbs")), new CoverService(Path.Combine(dir, "covers")),
+            new ScanCacheService(Path.Combine(dir, "scan")), Task.FromResult<ITitleDb?>(null),
+            new MockMediaProvider(Path.Combine(dir, "album"), Path.Combine(dir, "phone")));
+
+        var items = Enumerable.Range(0, 100).Select(i => Item("游戏A", $"{i}.jpg", new DateTime(2025, 1, 1).AddMinutes(i))).ToList();
+        var grid = new SwitchAlbum.ViewModels.GameGridViewModel("游戏A", items, main);
+        grid.SetViewportWidth(1207);
+        var startColumns = grid.Columns;
+
+        int? anchor = null;
+        grid.RowsReflowed += index => anchor = index;
+        grid.FirstVisibleIndex = 42;
+        grid.ChangeZoom(1);
+        var ok = grid.ZoomLevel == 2 && grid.Columns == startColumns - 1 && anchor == 42
+                 && grid.Rows.Sum(r => r.Items.Count) == 100
+                 && grid.Rows[0].Items.Count == grid.Columns;
+
+        grid.ChangeZoom(99);
+        ok &= grid.ZoomLevel == PhotoGridLayout.MaxZoomLevel;
+
+        var reopened = new SwitchAlbum.ViewModels.GameGridViewModel("游戏A", items, main);
+        var fromDisk = new SettingsService(Path.Combine(dir, "settings.json")).Current.PhotoZoomLevel;
+        await Task.CompletedTask;
+        return ok && reopened.ZoomLevel == PhotoGridLayout.MaxZoomLevel && fromDisk == PhotoGridLayout.MaxZoomLevel;
+    }
+    finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+});
+
+Add("设置: 第一次运行（窗口位置还是 NaN）也能保存", () =>
+{
+    var file = TempFile();
+    try
+    {
+        var settings = new SettingsService(file);
+        settings.Current.PhotoZoomLevel = 3;
+        settings.Current.SavePath = "D:\\照片";
+        settings.Save();
+        var loaded = new SettingsService(file).Current;
+        return loaded.PhotoZoomLevel == 3 && loaded.SavePath == "D:\\照片" && double.IsNaN(loaded.WindowLeft);
+    }
+    finally { File.Delete(file); }
+});
+
+// ---------- 封面匹配：宁可无封面，也不要别的游戏的封面 ----------
+static TitleDbService MatchingDb()
+{
+    var json = """
+    {
+      "0100CCCC00001000": { "en": "RITE" },
+      "0100CCCC00002000": { "en": "POOL" },
+      "0100CCCC00003000": { "en": "FINAL FANTASY VII" },
+      "0100CCCC00004000": { "en": "Wizard of Legend" },
+      "0100CCCC00005000": { "en": "Arcade Archives Scramble" },
+      "0100CCCC00006001": { "zht": "研究與毀滅之命運石之門角色扮演服裝" },
+      "0100CCCC00007000": { "en": "Hollow Knight" },
+      "0100CCCC00008000": { "en": "Hollow Knight Silksong" },
+      "0100CCCC00009000": { "en": "Dragon Quest Builders" },
+      "0100CCCC0000A000": { "en": "Dragon Quest Treasures" },
+      "0100CCCC0000B000": { "en": "Xenoblade2 (ゼノブレイド2) Nintendo Switch 2 Edition" },
+      "0100CCCC0000C000": { "en": "Dungeon Antiqua 2" }
+    }
+    """;
+    using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
+    return new TitleDbService(stream);
+}
+
+Add("封面匹配: 名称中间碰巧相同不算（Rewrite≠RITE）", () =>
+{
+    var db = MatchingDb();
+    return db.GetTitleIdByFolderName("Rewrite") == null
+        && db.GetTitleIdByFolderName("SWEET POOL") == null;
+});
+Add("封面匹配: DLC 不参与匹配", () => MatchingDb().GetTitleIdByFolderName("命运石之门") == null);
+Add("封面匹配: 不断在单词中间（VIII≠VII，SCRAMBLED≠Scramble）", () =>
+{
+    var db = MatchingDb();
+    return db.GetTitleIdByFolderName("FINAL FANTASY VIII Remastered") == null
+        && db.GetTitleIdByFolderName("Arcade Archives SCRAMBLED EGG") == null;
+});
+Add("封面匹配: 续作不算同一款（II≠本体，本体≠2）", () =>
+{
+    var db = MatchingDb();
+    return db.GetTitleIdByFolderName("Wizard of Legend II") == null
+        && db.GetTitleIdByFolderName("Wizard of Legend 2") == null
+        && db.GetTitleIdByFolderName("Dungeon Antiqua") == null;
+});
+Add("封面匹配: 文件夹是库名的开头：同一款取本体，不同游戏不猜", () =>
+{
+    var db = MatchingDb();
+    return db.GetTitleIdByFolderName("Hollow Knigh") == "0100CCCC00007000"
+        && db.GetTitleIdByFolderName("Dragon Quest") == null;
+});
+Add("封面匹配: 复合名称括号内外都能命中", () =>
+{
+    var db = MatchingDb();
+    return db.GetTitleIdByFolderName("ゼノブレイド２") == "0100CCCC0000B000"
+        && db.GetTitleIdByFolderName("Xenoblade2") == "0100CCCC0000B000";
+});
+Add("封面匹配: 真实库里文字冒险的典型误判已消失", () =>
+{
+    var db = TitleDbService.LoadEmbedded()!;
+    return new[] { "Rewrite", "SWEET POOL", "ATRI", "Summer Pockets", "命运石之门" }
+        .All(name => db.GetTitleIdByFolderName(name) == null)
+        && db.GetTitleIdByFolderName("CLANNAD") == "0100A3A00CC7E000";
+});
+
+// ---------- 自定义封面 ----------
+static string WriteImage(string dir, string name, int width = 64, int height = 64)
+{
+    Directory.CreateDirectory(dir);
+    var path = Path.Combine(dir, name);
+    using var bitmap = new System.Drawing.Bitmap(width, height);
+    bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+    return path;
+}
+
+AddAsync("自定义封面: 优先于默认封面，恢复后回到默认", async () =>
+{
+    var dir = TempDir();
+    try
+    {
+        var covers = new CoverService(Path.Combine(dir, "covers"), Path.Combine(dir, "overrides"));
+        const string tid = "0100F2C0115B6000";
+        var builtIn = await covers.ResolveAsync(tid, "塞尔达传说 王国之泪", null, default);
+        var custom = await covers.SetOverrideAsync("塞尔达传说 王国之泪", WriteImage(dir, "mine.png"));
+        var resolved = await covers.ResolveAsync(tid, "塞尔达传说 王国之泪", null, default);
+        var cleared = covers.ClearOverride("塞尔达传说 王国之泪");
+        var after = await covers.ResolveAsync(tid, "塞尔达传说 王国之泪", null, default);
+        return builtIn != null && resolved == custom && cleared && after == builtIn
+            && covers.GetOverride("塞尔达传说 王国之泪") == null;
+    }
+    finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+});
+AddAsync("自定义封面: Switch 相册和电脑文件夹名共用一张", async () =>
+{
+    var dir = TempDir();
+    try
+    {
+        var covers = new CoverService(Path.Combine(dir, "covers"), Path.Combine(dir, "overrides"));
+        var path = await covers.SetOverrideAsync("Mario: The Game?", WriteImage(dir, "mine.png"));
+        return covers.GetOverride(FileNameSanitizer.Sanitize("Mario: The Game?")) == path;
+    }
+    finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+});
+AddAsync("自定义封面: 清除缓存不会删掉", async () =>
+{
+    var dir = TempDir();
+    try
+    {
+        var cache = Path.Combine(dir, "covers");
+        var covers = new CoverService(cache);
+        var path = await covers.SetOverrideAsync("游戏A", WriteImage(dir, "mine.png"));
+        Directory.Delete(cache, recursive: true);
+        return File.Exists(path) && await covers.ResolveAsync(null, "游戏A", null, default) == path;
+    }
+    finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+});
+AddAsync("自定义封面: 再换一张只留最新的，文件名变化", async () =>
+{
+    var dir = TempDir();
+    try
+    {
+        var overrides = Path.Combine(dir, "overrides");
+        var covers = new CoverService(Path.Combine(dir, "covers"), overrides);
+        var first = await covers.SetOverrideAsync("游戏A", WriteImage(dir, "a.png"));
+        await Task.Delay(5);
+        var second = await covers.SetOverrideAsync("游戏A", WriteImage(dir, "b.png"));
+        return first != second && covers.GetOverride("游戏A") == second
+            && Directory.GetFiles(overrides).Length == 1;
+    }
+    finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+});
+AddAsync("自定义封面: 大图缩到 512 以内", async () =>
+{
+    var dir = TempDir();
+    try
+    {
+        var covers = new CoverService(Path.Combine(dir, "covers"), Path.Combine(dir, "overrides"));
+        var path = await covers.SetOverrideAsync("游戏A", WriteImage(dir, "big.png", 1600, 900));
+        using var image = System.Drawing.Image.FromFile(path);
+        return image.Width == 512 && image.Height == 288;
+    }
+    finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+});
+AddAsync("自定义封面: 打不开的文件报错，不留垃圾，不影响旧封面", async () =>
+{
+    var dir = TempDir();
+    try
+    {
+        var overrides = Path.Combine(dir, "overrides");
+        var covers = new CoverService(Path.Combine(dir, "covers"), overrides);
+        var good = await covers.SetOverrideAsync("游戏A", WriteImage(dir, "good.png"));
+        var bad = Path.Combine(dir, "bad.png");
+        File.WriteAllText(bad, "这不是图片");
+        try
+        {
+            await covers.SetOverrideAsync("游戏A", bad);
+            return false;
+        }
+        catch (Exception)
+        {
+            return covers.GetOverride("游戏A") == good && Directory.GetFiles(overrides).Length == 1;
+        }
+    }
+    finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+});
+
+// ---------- 原图缓存 ----------
+static async Task<(string Root, MockMediaProvider Provider, string Path)> PhotoOnMockSwitch()
+{
+    var root = TempDir();
+    var game = Path.Combine(root, "album", "Album", "游戏A");
+    WriteImage(game, "2025031118460900-ABC.jpg", 320, 180);
+    var provider = new MockMediaProvider(Path.Combine(root, "album"), Path.Combine(root, "phone"));
+    await Task.CompletedTask;
+    return (root, provider, string.Join('\\', "", "Album", "游戏A", "2025031118460900-ABC.jpg"));
+}
+
+AddAsync("原图缓存: 清除缓存后不用重启也能继续加载", async () =>
+{
+    var (root, provider, path) = await PhotoOnMockSwitch();
+    try
+    {
+        var device = (await provider.GetDevicesAsync(default)).First(d => d.IsSwitch);
+        await using var session = await provider.ConnectAsync(device, default);
+        var cache = Path.Combine(root, "thumbs");
+        var thumbs = new ThumbnailService(cache);
+        Directory.Delete(cache, recursive: true);
+        var thumb = await thumbs.GetThumbnailAsync("d", session, path, "a.jpg", null, 0, default);
+        var full = await thumbs.GetFullImageAsync("d", session, path, "a.jpg", null, 0, default);
+
+        var covers = Path.Combine(root, "covers");
+        var coverService = new CoverService(covers);
+        Directory.Delete(covers, recursive: true);
+        var cover = await coverService.ResolveAsync("0100F2C0115B6000", "塞尔达", null, default);
+        return thumb != null && full != null && cover != null;
+    }
+    finally { try { Directory.Delete(root, recursive: true); } catch { } }
+});
+AddAsync("原图缓存: 灯箱和网格同时要同一张图不会互相打架", async () =>
+{
+    var (root, provider, path) = await PhotoOnMockSwitch();
+    try
+    {
+        var device = (await provider.GetDevicesAsync(default)).First(d => d.IsSwitch);
+        await using var session = await provider.ConnectAsync(device, default);
+        var cache = Path.Combine(root, "thumbs");
+        var thumbs = new ThumbnailService(cache);
+        var results = await Task.WhenAll(
+            thumbs.GetFullImageAsync("d", session, path, "a.jpg", null, 0, default),
+            thumbs.GetFullImageAsync("d", session, path, "a.jpg", null, 0, default, background: true),
+            thumbs.GetFullImageAsync("d", session, path, "a.jpg", null, 0, default),
+            thumbs.GetFullImageAsync("d", session, path, "a.jpg", null, 0, default, background: true));
+        return results.All(r => r != null) && results.Distinct().Count() == 1
+            && Directory.GetFiles(cache).Length == 1;
+    }
+    finally { try { Directory.Delete(root, recursive: true); } catch { } }
+});
+AddAsync("原图缓存: 取消时抛出取消异常，不留临时文件", async () =>
+{
+    var (root, provider, path) = await PhotoOnMockSwitch();
+    try
+    {
+        var device = (await provider.GetDevicesAsync(default)).First(d => d.IsSwitch);
+        await using var session = await provider.ConnectAsync(device, default);
+        var cache = Path.Combine(root, "thumbs");
+        var thumbs = new ThumbnailService(cache);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        try
+        {
+            await thumbs.GetFullImageAsync("d", session, path, "a.jpg", null, 0, cts.Token, background: true);
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            return Directory.GetFiles(cache).Length == 0;
+        }
+    }
+    finally { try { Directory.Delete(root, recursive: true); } catch { } }
 });
 
 // ---------- 联网诊断（只打印结果，不影响通过与否） ----------

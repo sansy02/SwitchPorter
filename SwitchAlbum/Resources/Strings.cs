@@ -55,6 +55,9 @@ public static class Strings
     public const string Sort_NewestFirst = "从新到旧";
     public const string Sort_OldestFirst = "从旧到新";
     public const string Sort_Tooltip = "按拍摄时间排序";
+    public const string Zoom_Small = "小";
+    public const string Zoom_Large = "大";
+    public const string Zoom_Tooltip = "调整截图预览大小（也可以按住 Ctrl 滚动鼠标滚轮）。调大后会加载原图，看得清画面里的文字";
     public const string Lbl_Selected = "已选 {0} 项";
     public const string Card_AllGames = "全部";
     public const string Card_PhotoCount = "{0} 张照片";
@@ -65,6 +68,15 @@ public static class Strings
     public const string Badge_OnPhone = "已存手机";
     public const string Badge_OnBoth = "电脑+手机";
     public const string Cover_Unknown = "无封面";
+    public const string Cover_Change = "更换封面…";
+    public const string Cover_Reset = "恢复默认封面";
+    public const string Cover_SetFromPhoto = "设为这个游戏的封面";
+    public const string Cover_PickTitle = "选择「{0}」的封面图片";
+    public const string Cover_PickFilter = "图片|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif|所有文件|*.*";
+    public const string Cover_Changed = "已更换「{0}」的封面";
+    public const string Cover_Restored = "已恢复「{0}」的默认封面";
+    public const string Cover_BadImage = "这张图片打不开，换一张试试";
+    public const string Cover_ResetFailed = "恢复默认封面失败，请稍后再试";
 
     // ---------- 传输进度 / 结果 ----------
     public const string Status_Progress = "正在保存 {0}/{1}：{2}";
@@ -141,4 +153,5 @@ public static class Strings
     public const string Common_Ok = "确定";
     public const string Common_Cancel = "取消";
     public const string Lightbox_NoPreview = "视频无法在这里预览";
+    public const string Lightbox_Select = "选中（空格）";
 }

@@ -3,18 +3,18 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace SwitchAlbum.ViewModels;
 
-/// <summary>大图预览灯箱：左右切换、全图异步加载、视频调用系统播放器。</summary>
+/// <summary>大图预览灯箱：左右切换、全图异步加载、直接勾选（看清内容再决定要不要这张）、视频调用系统播放器。</summary>
 public sealed partial class LightboxViewModel : ObservableObject
 {
     private readonly List<PhotoItemViewModel> _items;
-    private readonly Func<PhotoItemViewModel, Task<string?>> _fullImageLoader;
+    private readonly Func<PhotoItemViewModel, CancellationToken, Task<string?>> _fullImageLoader;
     private readonly Action<PhotoItemViewModel> _openVideo;
     private CancellationTokenSource? _cts;
 
     public LightboxViewModel(
         IReadOnlyList<PhotoItemViewModel> items,
         PhotoItemViewModel current,
-        Func<PhotoItemViewModel, Task<string?>> fullImageLoader,
+        Func<PhotoItemViewModel, CancellationToken, Task<string?>> fullImageLoader,
         Action<PhotoItemViewModel> openVideo)
     {
         _items = items as List<PhotoItemViewModel> ?? items.ToList();
@@ -56,15 +56,32 @@ public sealed partial class LightboxViewModel : ObservableObject
         }
 
         IsImageLoading = true;
-        var path = await _fullImageLoader(item);
-        if (ct.IsCancellationRequested || path == null)
+        string? path;
+        try
         {
-            IsImageLoading = false;
+            path = await _fullImageLoader(item, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return; // 已经翻到下一张，这张的结果不要了
+        }
+
+        if (ct.IsCancellationRequested)
+        {
             return;
         }
 
         FullPath = path;
         IsImageLoading = false;
+    }
+
+    [RelayCommand]
+    private void ToggleSelected()
+    {
+        if (Current != null)
+        {
+            Current.IsSelected = !Current.IsSelected;
+        }
     }
 
     [RelayCommand]

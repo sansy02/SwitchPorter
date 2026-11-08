@@ -8,11 +8,20 @@
     <UserControl.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
         <conv:NullToVisibilityConverter x:Key="NullToVis"/>
+        <conv:InverseBooleanConverter x:Key="InvertBool"/>
+        <conv:FileImageConverter x:Key="FileImage"/>
     </UserControl.Resources>
     <Border x:Name="Root" Background="{DynamicResource SurfaceBrush}" CornerRadius="14"
             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"
             MouseEnter="Root_MouseEnter" MouseLeave="Root_MouseLeave"
-            MouseLeftButtonDown="Root_MouseLeftButtonDown">
+            MouseLeftButtonDown="Root_MouseLeftButtonDown"
+            ContextMenuService.IsEnabled="{Binding IsAllCard, Converter={StaticResource InvertBool}}">
+        <Border.ContextMenu>
+            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                <MenuItem Header="{x:Static res:Strings.Cover_Change}" Command="{Binding ChangeCoverCommand}"/>
+                <MenuItem Header="{x:Static res:Strings.Cover_Reset}" Command="{Binding ResetCoverCommand}"/>
+            </ContextMenu>
+        </Border.ContextMenu>
         <Border.RenderTransform>
             <ScaleTransform x:Name="RootScale" CenterX="109" CenterY="102"/>
         </Border.RenderTransform>
@@ -29,7 +38,7 @@
                     Visibility="{Binding IsAllCard, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
                 <Grid>
                     <Rectangle Fill="{DynamicResource PlaceholderBrush}"/>
-                    <Image Source="{Binding CoverPath}" Stretch="UniformToFill"/>
+                    <Image Source="{Binding CoverPath, Converter={StaticResource FileImage}}" Stretch="UniformToFill"/>
                     <TextBlock Text="{x:Static res:Strings.Cover_Unknown}" HorizontalAlignment="Center" VerticalAlignment="Center"
                                FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
                                Visibility="{Binding CoverPath, Converter={StaticResource NullToVis}}"/>
@@ -52,6 +61,26 @@
                                FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </Border>
             </Grid>
+
+            <!-- 更换封面：鼠标移到卡片上才出现（右键卡片是同一个菜单） -->
+            <Button x:Name="CoverButton" Content="✎" ToolTip="{x:Static res:Strings.Cover_Change}" Click="CoverButton_Click"
+                    Width="26" Height="26" Padding="0" FontSize="13" FontFamily="Segoe UI Symbol"
+                    HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsMouseOver, ElementName=Root}" Value="True"/>
+                                    <Condition Binding="{Binding IsAllCard}" Value="False"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
 
             <!-- 标题 -->
             <TextBlock Grid.Row="1" Text="{Binding Title}" HorizontalAlignment="Center" TextAlignment="Center"
